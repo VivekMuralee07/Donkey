@@ -116,7 +116,7 @@ function handHTML(hand,myTurn,ok){
 }
 
 function draw(){
-  if(!S){$.innerHTML=`<div class="panel"><h1>♠ ♥ Donkey ♦ ♣</h1><div class="sub">2–5 player card game. Pick a name, then create a room code and share it with your friends, or enter the code they gave you.</div>
+  if(!S){$.innerHTML=`<div class="panel"><h1>♠ ♥ Donkey ♦ ♣</h1><div class="sub">2–5 player card game (play alone against bots too). Pick a name, then create a room code and share it with friends, or enter the code they gave you.</div>
     <input id="nm" maxlength="14" placeholder="Your name" value="${esc(uname)}" style="text-transform:none;letter-spacing:0">
     <input id="rc" maxlength="6" placeholder="ROOM CODE" value="${esc(room)}"><button id="jb">Join / Create room</button>
     <div style="margin-top:10px"><button id="rnd" class="sec">Make a random code</button></div><div class="err">${esc(err)}</div></div>`;
@@ -126,13 +126,17 @@ function draw(){
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
   if(!S.game){const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
     let h=`<div class="panel"><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div class="sub">${n}/5 players seated</div>`;
-    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.online?'':' (offline)'}</span></div>`);
+    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.bot?' (bot)':''}${p.online?'':' (offline)'}</span></div>`);
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
     h+='</div>';
-    h+=n<2?'<p class="sub">Waiting for more players…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
+    const hasBot=S.players.some(p=>p.bot);
+    h+=`<div style="margin:4px 0">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Bots are easy level and play random legal cards.</div>`;
+    h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
     $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
+    const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot'});
+    const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
     const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
   const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
   const ok=new Set(g.ok);
