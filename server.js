@@ -46,19 +46,21 @@ function play(room, i, c) {
   g.trick.push({ p: i, c, off });
   if (!off && g.trick.length < n) { g.turn = (i + 1) % n; g.msg = P[i].name + ' played ' + name(c) + '.'; return true; }
   // The round ends: everyone followed suit, or someone had no card of the lead suit.
-  const t = g.trick, leader = t[0].p;
+  const t = g.trick;
   let next;
   if (off) {
-    g.hands[leader].push(...t.map(x => x.c));
-    g.msg = P[i].name + ' had no ' + SYM[g.lead] + ', so ' + P[leader].name + ' picks up ' + t.length + ' cards.';
-    next = leader;
+    // Everyone before the cutter followed suit: the highest of those cards picks up the whole table.
+    const hi = t.filter(x => !x.off).sort((a, b) => rk(b.c) - rk(a.c))[0];
+    g.hands[hi.p].push(...t.map(x => x.c));
+    g.msg = P[i].name + ' had no ' + SYM[g.lead] + '. ' + P[hi.p].name + ' (highest: ' + name(hi.c) + ') picks up ' + t.length + ' cards.';
+    next = hi.p;
   } else {
     const top = t.slice().sort((a, b) => rk(b.c) - rk(a.c))[0];
     g.msg = 'Round over. ' + name(top.c) + ' by ' + P[top.p].name + ' is highest; cards set aside.';
     next = top.p;
   }
   g.last = t; g.trick = []; g.turn = next; g.lead = -1;
-  const fin = t.map(x => x.p).find(k => g.hands[k].length === 0);
+  const fin = t.map(x => x.p).concat([next]).find(k => g.hands[k].length === 0);
   if (fin !== undefined) g.winner = fin;
   return true;
 }
