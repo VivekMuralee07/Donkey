@@ -8,6 +8,8 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 
 const AVATARS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const MAX_PLAYERS = 5;
+const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['🤖', '👾', '🎃', '🧠', '🛸'];
+const BOT_MS = Number(process.env.BOT_MS) || 1000;
 
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]);
@@ -83,18 +85,35 @@ function push(room) {
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
-      players: room.players.map(q => ({ name: q.name, online: !!q.ws, avatar: q.avatar })),
+      players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot })),
       game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, winner: g.winner, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
+  schedBot(room);
+}
+// Easy bot: plays a random legal card after a short pause.
+function schedBot(room) {
+  const g = room.game;
+  if (!g || g.winner >= 0 || room.botTimer) return;
+  const p = room.players[g.turn];
+  if (!p || !p.bot) return;
+  room.botTimer = setTimeout(() => {
+    room.botTimer = null;
+    const g2 = room.game;
+    if (!g2 || g2.winner >= 0) return;
+    const i = g2.turn, b = room.players[i];
+    if (!b || !b.bot) return;
+    const ok = playable(g2, i);
+    if (ok.length && play(room, i, ok[Math.floor(Math.random() * ok.length)])) push(room);
+  }, BOT_MS + Math.random() * BOT_MS * 0.7);
 }
 function leave(ws) {
   const room = ws.room; if (!room) return;
   const p = room.players.find(x => x.ws === ws);
   if (p) p.ws = null;
-  if (!room.game) room.players = room.players.filter(x => x.ws); // free the seat if no game started
+  if (!room.game) room.players = room.players.filter(x => x.ws || x.bot); // free the seat if no game started
   ws.room = null;
-  if (!room.players.length) rooms.delete(room.code); else push(room);
+  if (!room.players.some(p => !p.bot)) { clearTimeout(room.botTimer); rooms.delete(room.code); } else push(room);
 }
 setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) if (now - r.touched > 6 * 3600e3 && r.players.every(p => !p.ws)) rooms.delete(k); }, 600e3);
 
@@ -128,6 +147,17 @@ wss.on('connection', ws => {
       if (m.type === 'avatar') {
         if (!room.game && idx >= 0 && AVATARS.includes(m.a) && !room.players.some((q, k) => k !== idx && q.avatar === m.a)) { room.players[idx].avatar = m.a; push(room); }
         return;
+      }
+      if (m.type === 'addbot') {
+        if (room.game || idx < 0 || room.players.length >= MAX_PLAYERS) return;
+        const nb = room.players.filter(q => q.bot).length;
+        room.players.push({ sub: 'bot-' + Date.now() + '-' + nb, name: 'Bot ' + BOT_NAMES[nb % BOT_NAMES.length], ws: null, bot: true, avatar: BOT_AVATARS[nb % BOT_AVATARS.length] });
+        return push(room);
+      }
+      if (m.type === 'rmbot') {
+        if (room.game || idx < 0) return;
+        for (let k = room.players.length - 1; k >= 0; k--) if (room.players[k].bot) { room.players.splice(k, 1); break; }
+        return push(room);
       }
       if (m.type === 'start' || m.type === 'again') {
         if (room.players.length < 2) return send(ws, { type: 'error', text: 'Need at least 2 players.' });
