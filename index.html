@@ -82,8 +82,8 @@ function draw(){
   const ok=new Set(g.ok),hand=g.hand.slice().sort((a,b)=>su(a)-su(b)||rk(b)-rk(a));
   hand.forEach(c=>h+=card(c,my&&ok.has(c)?'ok':'no',`data-c="${c}"`));
   h+='</div>';
-  if(my&&g.trick.length&&!hand.some(c=>su(c)===g.lead))h+=`<div class="log">No ${SU[g.lead]}? Pick any card. ${esc(P[g.trick[0].p].name)} will pick up all the cards on the table.</div>`;
-  $.innerHTML=h+`</div><div class="err" style="text-align:center">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the round's first player picks up all cards on the table.</div>`;
+  if(my&&g.trick.length&&!hand.some(c=>su(c)===g.lead))h+=`<div class="log">No ${SU[g.lead]}? Pick any card. ${esc(P[g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p].name)} (highest card so far) will pick up all the cards on the table.</div>`;
+  $.innerHTML=h+`</div><div class="err" style="text-align:center">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the player with the highest card of that round picks up all cards on the table.</div>`;
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>send({type:'play',card:+e.dataset.c}));
   const a=document.getElementById('ag');if(a)a.onclick=()=>send({type:'again'});
 }
