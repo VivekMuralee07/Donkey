@@ -22,9 +22,10 @@ const name = c => (RL[rk(c)] || rk(c)) + SYM[su(c)];
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
 function newGame(room) {
+  const n = room.players.length;
   const deck = shuffle([...Array(52).keys()]);
-  const hands = [[], [], []];
-  deck.forEach((c, i) => hands[i % 3].push(c));
+  const hands = Array.from({ length: n }, () => []);
+  deck.forEach((c, i) => hands[i % n].push(c));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
   room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [],
     msg: room.players[first].name + ' holds the Ace of Spades and starts.' };
@@ -37,20 +38,28 @@ function playable(g, i) {
   return f.length ? f : h;
 }
 function play(room, i, c) {
-  const g = room.game, P = room.players;
+  const g = room.game, P = room.players, n = P.length;
   if (!g || g.winner >= 0 || g.turn !== i || !playable(g, i).includes(c)) return false;
   g.hands[i].splice(g.hands[i].indexOf(c), 1);
   if (!g.trick.length) { g.lead = su(c); g.first = false; }
   const off = su(c) !== g.lead;
   g.trick.push({ p: i, c, off });
-  if (g.trick.length < 3) { g.turn = (i + 1) % 3; g.msg = P[i].name + ' played ' + name(c) + (off ? ' (off-suit)' : '') + '.'; return true; }
-  const inSuit = g.trick.filter(t => su(t.c) === g.lead).sort((a, b) => rk(b.c) - rk(a.c));
-  const w = inSuit[0].p, gifts = g.trick.filter(t => t.off).map(t => t.c);
-  g.hands[w].push(...gifts);
-  g.msg = P[w].name + ' wins the round with ' + name(inSuit[0].c) + (gifts.length ? ' and receives ' + gifts.length + ' card(s).' : '.');
-  g.last = g.trick; g.trick = []; g.turn = w; g.lead = -1;
-  const done = [0, 1, 2].filter(k => g.hands[k].length === 0);
-  if (done.length) g.winner = done[0];
+  if (!off && g.trick.length < n) { g.turn = (i + 1) % n; g.msg = P[i].name + ' played ' + name(c) + '.'; return true; }
+  // The round ends: everyone followed suit, or someone had no card of the lead suit.
+  const t = g.trick, leader = t[0].p;
+  let next;
+  if (off) {
+    g.hands[leader].push(...t.map(x => x.c));
+    g.msg = P[i].name + ' had no ' + SYM[g.lead] + ', so ' + P[leader].name + ' picks up ' + t.length + ' cards.';
+    next = leader;
+  } else {
+    const top = t.slice().sort((a, b) => rk(b.c) - rk(a.c))[0];
+    g.msg = 'Round over. ' + name(top.c) + ' by ' + P[top.p].name + ' is highest; cards set aside.';
+    next = top.p;
+  }
+  g.last = t; g.trick = []; g.turn = next; g.lead = -1;
+  const fin = t.map(x => x.p).find(k => g.hands[k].length === 0);
+  if (fin !== undefined) g.winner = fin;
   return true;
 }
 
@@ -101,7 +110,7 @@ wss.on('connection', ws => {
       const room = ws.room; if (!room) return;
       const idx = room.players.findIndex(x => x.ws === ws);
       if (m.type === 'start' || m.type === 'again') {
-        if (room.players.length !== 3) return send(ws, { type: 'error', text: 'Need exactly 3 players.' });
+        if (room.players.length < 2) return send(ws, { type: 'error', text: 'Need at least 2 players.' });
         if (room.game && room.game.winner < 0) return;
         newGame(room); return push(room);
       }
