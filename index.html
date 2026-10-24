@@ -46,6 +46,7 @@ button:disabled{opacity:.4}
 .fan{display:flex;justify-content:center;margin-top:5px;height:28px}
 .back{width:20px;height:28px;border-radius:4px;margin-left:-12px;background:repeating-linear-gradient(45deg,#8e1b2c 0 3px,#b8283c 3px 6px);border:2px solid #fff;box-shadow:0 1px 3px #0009}
 .center{min-height:112px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:6px;border-radius:50%/42%;background:radial-gradient(ellipse at center,#00000038,transparent 72%);border:2px dashed #f5c54230}
+.center.dense{gap:0}.center.dense>div{margin-left:-26px}.center.dense>div:first-child{margin-left:0}.center.dense .who{display:none}
 .center>div:nth-child(odd) .card{rotate:-3deg}.center>div:nth-child(even) .card{rotate:3deg}
 .msg{text-align:center;font-size:15px;min-height:22px;margin:5px 0;text-shadow:0 1px 2px #0008}
 .pill{display:inline-block;padding:6px 18px;border-radius:99px;background:#0008;border:1px solid #ffffff2a;font-weight:800}
@@ -178,7 +179,7 @@ function render(){
   const ok=new Set(g.ok);tableMode=true;
   if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
   const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
-  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center">`;
+  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
   if(g.trick.length)g.trick.forEach((t,ti)=>h+=`<div>${card(t.c,ti>=prevTL?'pl':'')}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   prevTL=g.trick.length;
@@ -193,7 +194,7 @@ function render(){
     else h+='<div class="bar"><div class="hint">Waiting for '+esc(P[g.turn].name)+'…</div></div>';
   }
   h+=handHTML(g.hand,my,ok);
-  $.innerHTML=h+`</div><div class="err">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the player with the highest card of that round picks up all cards on the table.</div>`;
+  $.innerHTML=h+`</div><div class="err">${esc(err)}</div><div class="log">Follow the lead suit if you can. When everyone has played a card of the same suit, the round ends, those cards are set aside and the highest card leads next. If someone has no card of that suit, they play any card and the player with the highest card of that suit in the round picks up all the cards on the table.</div>`;
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.k?null:e.dataset.k;draw()});
   const pl=document.getElementById('pl');if(pl)pl.onclick=()=>{const c=parseInt(sel,10);sel=null;send({type:'play',card:c})};
   const cx=document.getElementById('cx');if(cx)cx.onclick=()=>{sel=null;draw()};
