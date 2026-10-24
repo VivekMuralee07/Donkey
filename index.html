@@ -67,23 +67,23 @@ function draw(){
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
   if(!S.game){let h=`<div class="panel"><h1>Room ${esc(S.room)}</h1><div class="sub">Share this room code with your friends (${S.players.length}/3 seated)</div>`;
     S.players.forEach(p=>h+=`<div class="seat">🃏 ${esc(p.name)}${p.online?'':' (offline)'}</div>`);
-    h+=S.players.length<3?'<p class="sub">Waiting for more players…</p>':'<button id="st">Deal the cards</button>';
+    h+=S.players.length<2?'<p class="sub">Waiting for more players…</p>':(S.players.length<3?'<p class="sub">Waiting for a 3rd player, or start now with 2.</p>':'')+`<button id="st">Deal the cards (${S.players.length} players)</button>`;
     $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
-  const g=S.game,me=S.me,L=(me+1)%3,R=(me+2)%3,my=g.turn===me&&g.winner<0,P=S.players;
+  const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players;
   const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<br>${g.counts[i]} card${g.counts[i]==1?'':'s'}<div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],10))}</div></div>`;
-  let h=`<div class="table"><div class="top">${opp(L)}${opp(R)}</div><div class="center">`;
+  let h=`<div class="table"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center">`;
   if(g.trick.length)g.trick.forEach(t=>h+=`<div>${card(t.c,'pl')}<span class="who">${esc(P[t.p].name)}${t.off?' (gave)':''}</span></div>`);
-  else g.last.forEach(t=>h+=`<div style="opacity:.55">${card(t.c)}<span class="who">${esc(P[t.p].name)}</span></div>`);
+  else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   h+='</div>';
-  if(g.winner>=0){const lo=[0,1,2].sort((a,b)=>g.counts[b]-g.counts[a])[0];
+  if(g.winner>=0){const lo=P.map((_,i)=>i).sort((a,b)=>g.counts[b]-g.counts[a])[0];
     h+=`<div class="win">🏆 ${esc(P[g.winner].name)} finished first!</div><div class="msg">🫏 ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div style="text-align:center"><button id="ag">Play again</button></div>`}
   else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><b>${my?'👉 Your turn':esc(P[g.turn].name)+'’s turn'}</b></div>`;
   h+=`<div class="me ${my?'turn':''}">${esc(P[me].name)} (you) · ${g.hand.length} cards</div><div class="hand">`;
   const ok=new Set(g.ok),hand=g.hand.slice().sort((a,b)=>su(a)-su(b)||rk(b)-rk(a));
   hand.forEach(c=>h+=card(c,my&&ok.has(c)?'ok':'no',`data-c="${c}"`));
   h+='</div>';
-  if(my&&g.trick.length&&!hand.some(c=>su(c)===g.lead))h+=`<div class="log">No ${SU[g.lead]}? Pick any card to give to the round’s winner.</div>`;
-  $.innerHTML=h+`</div><div class="err" style="text-align:center">${esc(err)}</div>`;
+  if(my&&g.trick.length&&!hand.some(c=>su(c)===g.lead))h+=`<div class="log">No ${SU[g.lead]}? Pick any card. ${esc(P[g.trick[0].p].name)} will pick up all the cards on the table.</div>`;
+  $.innerHTML=h+`</div><div class="err" style="text-align:center">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the round's first player picks up all cards on the table.</div>`;
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>send({type:'play',card:+e.dataset.c}));
   const a=document.getElementById('ag');if(a)a.onclick=()=>send({type:'again'});
 }
