@@ -6,6 +6,9 @@ const PORT = process.env.PORT || 3000;
 const PUB = __dirname;
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
+const AVATARS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
+const MAX_PLAYERS = 5;
+
 const server = http.createServer((req, res) => {
   let u = decodeURIComponent(req.url.split('?')[0]);
   if (u === '/') u = '/index.html';
@@ -21,11 +24,18 @@ const SYM = ['♠', '♣', '♦', '♥'], RL = { 11: 'J', 12: 'Q', 13: 'K', 14: 
 const name = c => (RL[rk(c)] || rk(c)) + SYM[su(c)];
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
+// 2 players: 13 cards each (26 of 52). 3 players: 13 each (39 of 52). 4-5 players: two decks split equally (26 / 20 each).
+// The Ace of Spades is always among the dealt cards, so someone can start.
 function newGame(room) {
   const n = room.players.length;
-  const deck = shuffle([...Array(52).keys()]);
-  const hands = Array.from({ length: n }, () => []);
-  deck.forEach((c, i) => hands[i % n].push(c));
+  const decks = n >= 4 ? 2 : 1, per = n >= 4 ? Math.floor(104 / n) : 13;
+  let hands;
+  do {
+    const pool = [];
+    for (let d = 0; d < decks; d++) for (let c = 0; c < 52; c++) pool.push(c);
+    shuffle(pool);
+    hands = Array.from({ length: n }, (_, i) => pool.slice(i * per, (i + 1) * per));
+  } while (!hands.some(h => h.includes(ACE_SPADES)));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
   room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [],
     msg: room.players[first].name + ' holds the Ace of Spades and starts.' };
@@ -73,7 +83,7 @@ function push(room) {
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
-      players: room.players.map(q => ({ name: q.name, online: !!q.ws })),
+      players: room.players.map(q => ({ name: q.name, online: !!q.ws, avatar: q.avatar })),
       game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, winner: g.winner, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
@@ -105,12 +115,20 @@ wss.on('connection', ws => {
         if (!room) { room = { code, players: [], game: null, touched: Date.now() }; rooms.set(code, room); }
         let p = room.players.find(x => x.sub === ws.user.sub);
         if (p) { if (p.ws && p.ws !== ws) { p.ws.room = null; send(p.ws, { type: 'error', text: 'Signed in on another device.' }); } p.ws = ws; }
-        else if (room.game || room.players.length >= 3) return send(ws, { type: 'error', text: 'This room is full (max 3 players).', left: true });
-        else room.players.push({ sub: ws.user.sub, name: ws.user.name, ws });
+        else if (room.game || room.players.length >= MAX_PLAYERS) return send(ws, { type: 'error', text: 'This room is full or the game has already started (max ' + MAX_PLAYERS + ' players).', left: true });
+        else {
+          const taken = new Set(room.players.map(q => q.avatar));
+          const av = AVATARS.includes(m.avatar) && !taken.has(m.avatar) ? m.avatar : AVATARS.find(x => !taken.has(x));
+          room.players.push({ sub: ws.user.sub, name: ws.user.name, ws, avatar: av });
+        }
         ws.room = room; return push(room);
       }
       const room = ws.room; if (!room) return;
       const idx = room.players.findIndex(x => x.ws === ws);
+      if (m.type === 'avatar') {
+        if (!room.game && idx >= 0 && AVATARS.includes(m.a) && !room.players.some((q, k) => k !== idx && q.avatar === m.a)) { room.players[idx].avatar = m.a; push(room); }
+        return;
+      }
       if (m.type === 'start' || m.type === 'again') {
         if (room.players.length < 2) return send(ws, { type: 'error', text: 'Need at least 2 players.' });
         if (room.game && room.game.winner < 0) return;
