@@ -37,15 +37,15 @@ button:disabled{opacity:.4}
 .table::before{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-radial-gradient(circle at 20% 30%,#ffffff07 0 1px,transparent 1px 3px);pointer-events:none}
 .table>*{position:relative}
 .top{display:flex;flex-wrap:wrap;gap:8px}
-.opp{flex:1 1 84px;min-width:0;text-align:center;padding:8px 4px 6px;border-radius:16px;background:linear-gradient(180deg,#00000070,#00000035);font-size:13px;border:2px solid #ffffff18;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.opp .av{width:46px;height:46px;margin:0 auto 3px;font-size:28px}
+.opp{flex:1 1 84px;min-width:0;text-align:center;padding:6px 4px 4px;border-radius:16px;background:linear-gradient(180deg,#00000070,#00000035);font-size:13px;border:2px solid #ffffff18;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.opp .av{width:40px;height:40px;margin:0 auto 2px;font-size:24px}
 .opp.turn .av,.me.turn .av{box-shadow:0 0 0 3px var(--gold),0 0 16px var(--gold)}
 .opp .cnt{display:inline-block;background:#000a;border-radius:99px;padding:1px 9px;font-size:12px;margin-top:2px}
 .turn{border-color:var(--gold)!important;box-shadow:0 0 18px #f5c54299;animation:glow 1.3s ease-in-out infinite alternate}
 @keyframes glow{from{box-shadow:0 0 8px #f5c54255}to{box-shadow:0 0 22px #f5c542cc}}
 .fan{display:flex;justify-content:center;margin-top:5px;height:28px}
 .back{width:20px;height:28px;border-radius:4px;margin-left:-12px;background:repeating-linear-gradient(45deg,#8e1b2c 0 3px,#b8283c 3px 6px);border:2px solid #fff;box-shadow:0 1px 3px #0009}
-.center{min-height:150px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0;padding:8px;border-radius:50%/42%;background:radial-gradient(ellipse at center,#00000038,transparent 72%);border:2px dashed #f5c54230}
+.center{min-height:112px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:6px;border-radius:50%/42%;background:radial-gradient(ellipse at center,#00000038,transparent 72%);border:2px dashed #f5c54230}
 .center>div:nth-child(odd) .card{rotate:-3deg}.center>div:nth-child(even) .card{rotate:3deg}
 .msg{text-align:center;font-size:15px;min-height:22px;margin:5px 0;text-shadow:0 1px 2px #0008}
 .pill{display:inline-block;padding:6px 18px;border-radius:99px;background:#0008;border:1px solid #ffffff2a;font-weight:800}
@@ -60,17 +60,17 @@ button:disabled{opacity:.4}
 .who{display:block;text-align:center;font-size:11px;color:#e3f6ea;margin-top:4px;text-shadow:0 1px 2px #000}
 .me{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px;border-radius:14px;border:2px solid transparent;margin-top:6px;font-size:15px;font-weight:700}
 .me .av{width:40px;height:40px;font-size:26px}
-.hand{margin-top:8px;border-radius:18px;padding:10px 4px 4px;background:linear-gradient(180deg,#00000060,#00000026);border:1px solid #ffffff1c;box-shadow:inset 0 2px 10px #0008}
-.hrow{display:flex;align-items:flex-end;justify-content:center;gap:6px;margin-bottom:2px}
-.hs{width:30px;height:30px;line-height:30px;border-radius:50%;background:#ffffff1c;text-align:center;font-size:20px;color:#fff;margin-bottom:12px}.hs.r{color:#ff7b7b}.hs:empty{background:none}
+.hand{margin-top:4px;border-radius:16px;padding:6px 4px 2px;background:linear-gradient(180deg,#00000060,#00000026);border:1px solid #ffffff1c;box-shadow:inset 0 2px 10px #0008}
+.hrow{display:flex;align-items:flex-start;justify-content:center;gap:6px}
+.hs{width:26px;height:26px;line-height:26px;border-radius:50%;background:#ffffff1c;text-align:center;font-size:17px;color:#fff;margin-top:8px}.hs.r{color:#ff7b7b}.hs:empty{background:none}
 .hr{position:relative}
-.hr .card{position:absolute;width:var(--cw);height:var(--ch);font-size:var(--fs);padding:5px 4px 4px 6px;transition:top .12s,filter .12s;box-shadow:-3px 0 6px #0008}
+.hr .card{position:absolute;width:var(--cw);height:var(--ch);font-size:var(--fs);padding:3px 3px 2px 5px;transition:top .12s,filter .12s;box-shadow:-3px 0 6px #0008}
 .hr .card .rk{font-size:1.1em}.hr .card .st{font-size:1em}.hr .card .c{font-size:calc(var(--cw)*.62)}
 .hr .card.ok{outline:2px solid var(--gold);cursor:pointer}.hr .card.no{filter:brightness(.55)}
 .hr .card.sel{outline:3px solid #fff;box-shadow:0 0 18px var(--gold),0 6px 14px #000a}
 .deal .card{animation:deal .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--n,0)*35ms)}
 @keyframes deal{from{transform:translateY(-130px) rotate(-22deg) scale(.5);opacity:0}to{transform:none;opacity:1}}
-.bar{display:flex;justify-content:center;align-items:center;gap:10px;margin:8px 0 2px;min-height:44px;flex-wrap:wrap}
+.bar{display:flex;justify-content:center;align-items:center;gap:10px;margin:4px 0 2px;min-height:40px;flex-wrap:wrap}
 .hint{color:#e7f5ec;font-size:14px;text-align:center}
 .log{font-size:12px;color:var(--mut);text-align:center;margin-top:10px}
 .win{font-size:26px;font-weight:900;color:var(--gold);text-align:center;margin:8px 0;text-shadow:0 2px 0 #5a3b00,0 0 18px #f5c54288}
@@ -78,6 +78,11 @@ button:disabled{opacity:.4}
 .donk .don{display:inline-block;animation:wob 1s ease-in-out infinite}@keyframes wob{25%{transform:rotate(-14deg)}75%{transform:rotate(14deg)}}
 .rain{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:98}
 .rain span{position:absolute;top:-40px;animation:fall linear forwards}@keyframes fall{to{transform:translateY(112vh) rotate(540deg)}}
+/* progressively tighter table when the screen is short, so nobody has to scroll */
+.table+.err{min-height:0}
+.c1 .log,.c2 .log,.c3 .log{display:none}.c1 .center{min-height:92px;margin:4px 0}
+.c2 .opp .av{width:32px;height:32px;font-size:20px}.c2 .fan{display:none}.c2 .center{min-height:70px}.c2 .center .card{width:40px;height:58px;font-size:14px}
+.c3 .table,.table.c3{padding:8px}.c3 .msg{margin:2px 0;min-height:0}.c3 .me .av{width:28px;height:28px;font-size:18px}.c3 .center{min-height:56px;margin:2px 0}.c3 .center .card{width:34px;height:50px;font-size:12px}.c3 .who{display:none}.c3 .opp .cnt{margin-top:0}
 @media(min-width:520px){.card{width:60px;height:88px;font-size:22px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style></head><body>
@@ -87,7 +92,7 @@ button:disabled{opacity:.4}
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0;
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false;
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 /* ---- sounds: all tones are generated in the browser (no audio files, no copyright) ---- */
@@ -129,25 +134,24 @@ function plan(n){return n===2?'2 players: 13 cards each (half a deck, picked at 
 
 /* Hand: cards grouped in one row per suit, highest rank first. Tap a highlighted card to select it, then press Play. */
 function handHTML(hand,myTurn,ok){
-  const vw=Math.min(window.innerWidth,760),cw=vw>520?74:60,ch=Math.round(cw*1.45),fs=Math.round(cw*.43);
+  const k0=[1,.92,.85,.78,.72,.66,.62][lvl],vw=Math.min(window.innerWidth,760),cw=Math.round((vw>520?66:52)*k0),ch=Math.round(cw*1.45),fs=Math.max(12,Math.round(cw*.43)),pitch=Math.round(ch*.74);
   const W=Math.max(200,vw-92),minStep=cw*.55,per=Math.max(1,Math.floor((W-cw)/minStep)+1),seen={};let idx=0;
+  const rows=[];
+  for(let s=0;s<4;s++){const cs=hand.filter(c=>su(c)===s).sort((a,b)=>rk(b)-rk(a));for(let i=0;i<cs.length;i+=per)rows.push({s,first:i===0,row:cs.slice(i,i+per)})}
   let h=`<div class="hand ${animHand?'deal':''}" style="--cw:${cw}px;--ch:${ch}px;--fs:${fs}px">`;
-  for(let s=0;s<4;s++){
-    const cs=hand.filter(c=>su(c)===s).sort((a,b)=>rk(b)-rk(a));
-    for(let i=0;i<cs.length;i+=per){
-      const row=cs.slice(i,i+per),step=row.length>1?Math.min(cw*.85,(W-cw)/(row.length-1)):0,w=cw+step*(row.length-1);
-      h+=`<div class="hrow"><span class="hs ${s>1?'r':''}">${i===0?SU[s]:''}</span><div class="hr" style="width:${w}px;height:${ch+16}px">`;
-      row.forEach((c,k)=>{
-        seen[c]=(seen[c]||0)+1;const key=c+'-'+seen[c],can=myTurn&&ok.has(c),isSel=sel===key;
-        h+=card(c,(can?'ok ':myTurn?'no ':'')+(isSel?'sel':''),`data-c="${c}" data-k="${key}" style="left:${k*step}px;top:${isSel?0:can?8:16}px;z-index:${isSel?60:k};--n:${idx++}"`);
-      });
-      h+='</div></div>';
-    }
-  }
+  rows.forEach((r,ri)=>{
+    const row=r.row,step=row.length>1?Math.min(cw*.85,(W-cw)/(row.length-1)):0,w=cw+step*(row.length-1),last=ri===rows.length-1;
+    let cards='',hasSel=false;
+    row.forEach((c,k)=>{
+      seen[c]=(seen[c]||0)+1;const key=c+'-'+seen[c],can=myTurn&&ok.has(c),isSel=sel===key;if(isSel)hasSel=true;
+      cards+=card(c,(can?'ok ':myTurn?'no ':'')+(isSel?'sel':''),`data-c="${c}" data-k="${key}" style="left:${k*step}px;top:${isSel?0:can?4:8}px;z-index:${isSel?60:k};--n:${idx++}"`);
+    });
+    h+=`<div class="hrow"><span class="hs ${r.s>1?'r':''}">${r.first?SU[r.s]:''}</span><div class="hr" style="width:${w}px;height:${last?ch+8:pitch}px;z-index:${hasSel?100:ri+1}">${cards}</div></div>`;
+  });
   return h+'</div>';
 }
 
-function draw(){
+function render(){
   if(!S){$.innerHTML=`<div class="panel">${HERO}${LOGO}<div class="sub">2–5 player card game (play alone against bots too). Pick a name, then create a room code and share it with friends, or enter the code they gave you.</div>
     <input id="nm" maxlength="14" placeholder="Your name" value="${esc(uname)}" style="text-transform:none;letter-spacing:0">
     <input id="rc" maxlength="6" placeholder="ROOM CODE" value="${esc(room)}"><button id="jb">Join / Create room</button>
@@ -171,10 +175,10 @@ function draw(){
     const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
     const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
   const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
-  const ok=new Set(g.ok);
+  const ok=new Set(g.ok);tableMode=true;
   if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
   const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
-  let h=`<div class="table"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center">`;
+  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center">`;
   if(g.trick.length)g.trick.forEach((t,ti)=>h+=`<div>${card(t.c,ti>=prevTL?'pl':'')}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   prevTL=g.trick.length;
@@ -188,12 +192,19 @@ function draw(){
     else if(my)h+=`<div class="bar"><div class="hint">${g.trick.length&&!g.hand.some(c=>su(c)===g.lead)?`No ${SU[g.lead]}? Tap any card. ${av(g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p)} ${esc(P[g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p].name)} (highest so far) will pick up all the cards on the table.`:'Tap a glowing card, then press Play.'}</div></div>`;
     else h+='<div class="bar"><div class="hint">Waiting for '+esc(P[g.turn].name)+'…</div></div>';
   }
-  h+=handHTML(g.hand,my,ok);animHand=false;
+  h+=handHTML(g.hand,my,ok);
   $.innerHTML=h+`</div><div class="err">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the player with the highest card of that round picks up all cards on the table.</div>`;
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.k?null:e.dataset.k;draw()});
   const pl=document.getElementById('pl');if(pl)pl.onclick=()=>{const c=parseInt(sel,10);sel=null;send({type:'play',card:c})};
   const cx=document.getElementById('cx');if(cx)cx.onclick=()=>{sel=null;draw()};
   const a=document.getElementById('ag');if(a)a.onclick=()=>send({type:'again'});
+}
+function fits(){try{return $.getBoundingClientRect().bottom+(window.scrollY||0)+14<=window.innerHeight}catch(e){return true}}
+/* Draw the table; if it is taller than the screen, shrink cards and spacing step by step until it fits (no scrolling). */
+function draw(){
+  const a=animHand,p=prevTL;lvl=0;
+  for(;;){animHand=a;prevTL=p;tableMode=false;render();if(!tableMode||lvl>=6||fits())break;lvl++}
+  animHand=false;
 }
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(draw,150)});
 connect();draw();
