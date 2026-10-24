@@ -11,37 +11,55 @@
 *{box-sizing:border-box}html,body{margin:0;min-height:100%}
 body{background:radial-gradient(ellipse at top,var(--felt2),var(--bg) 70%) fixed;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));min-height:100vh}
 h1{margin:0 0 4px;font-size:24px}.sub{color:var(--mut);font-size:13px;margin-bottom:12px}
-.panel{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px;max-width:480px;margin:8vh auto 0;text-align:center}
+.panel{background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:16px;max-width:480px;margin:6vh auto 0;text-align:center}
 input{font-size:18px;text-transform:uppercase;letter-spacing:4px;text-align:center;padding:10px;border-radius:10px;border:1px solid #888;width:100%;margin:10px 0}
 button{font-size:16px;font-weight:700;padding:11px 18px;border:0;border-radius:10px;background:var(--gold);color:#2a2000}
-button:disabled{opacity:.45}.seat{padding:8px;margin:6px 0;border-radius:10px;background:rgba(255,255,255,.08)}
-#snd{position:fixed;top:max(8px,env(safe-area-inset-top));right:10px;z-index:9;width:38px;height:38px;padding:0;font-size:18px;border-radius:50%;background:#0006;color:#fff}
-.err{color:#ffb4a8;min-height:20px;font-size:14px}
+button.sec{background:#ffffff30;color:#fff}button:disabled{opacity:.45}
+#snd{position:fixed;top:max(8px,env(safe-area-inset-top));right:10px;z-index:99;width:38px;height:38px;padding:0;font-size:18px;border-radius:50%;background:#0008;color:#fff}
+.seat{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:6px 0;border-radius:10px;background:rgba(255,255,255,.08);text-align:left;font-size:16px}
+.seat .big{font-size:30px}
+.avs{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:8px 0 14px}
+.avs button{width:48px;height:48px;padding:0;font-size:28px;border-radius:50%;background:#ffffff1c}
+.avs button.mine{background:var(--gold);box-shadow:0 0 12px var(--gold)}.avs button.taken{opacity:.25}
+.code{font-size:30px;letter-spacing:6px;font-weight:800;color:var(--gold)}
+.err{color:#ffb4a8;min-height:20px;font-size:14px;text-align:center}
 .table{max-width:760px;margin:0 auto;background:radial-gradient(ellipse at center,var(--felt),var(--felt2));border:6px solid #5a3b1e;border-radius:26px;padding:12px;box-shadow:inset 0 0 40px #0007,0 8px 24px #0006}
-.top{display:flex;gap:8px}.opp{flex:1;text-align:center;padding:8px;border-radius:12px;background:#0004;font-size:14px;border:2px solid transparent}
+.top{display:flex;flex-wrap:wrap;gap:6px}
+.opp{flex:1 1 76px;min-width:0;text-align:center;padding:6px 4px;border-radius:12px;background:#0004;font-size:13px;border:2px solid transparent;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.opp .av{font-size:26px;line-height:1.1}.opp .cnt{color:#cfe8d9;font-size:12px}
 .turn{border-color:var(--gold)!important;box-shadow:0 0 14px var(--gold)}
-.fan{display:flex;justify-content:center;margin-top:6px;height:34px}
-.back{width:24px;height:34px;border-radius:4px;margin-left:-14px;background:repeating-linear-gradient(45deg,#7b1e2b,#7b1e2b 4px,#a12a3a 4px,#a12a3a 8px);border:1px solid #fff}
-.center{min-height:150px;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+.fan{display:flex;justify-content:center;margin-top:4px;height:26px}
+.back{width:18px;height:26px;border-radius:3px;margin-left:-11px;background:repeating-linear-gradient(45deg,#7b1e2b,#7b1e2b 4px,#a12a3a 4px,#a12a3a 8px);border:1px solid #fff}
+.center{min-height:140px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
 .msg{text-align:center;font-size:15px;min-height:22px;margin:4px 0}
-.card{width:58px;height:84px;background:var(--card);color:#1a1a1a;border-radius:8px;box-shadow:0 2px 6px #0007;display:inline-flex;flex-direction:column;justify-content:space-between;padding:4px 5px;font-weight:700;font-size:16px;line-height:1;flex:none;user-select:none}
-.card.r{color:var(--red)}.card .c{font-size:30px;text-align:center}.card .b{transform:rotate(180deg)}
+.card{width:50px;height:74px;background:var(--card);color:#1a1a1a;border-radius:8px;box-shadow:0 2px 6px #0007;display:inline-flex;flex-direction:column;justify-content:space-between;padding:3px 4px;font-weight:800;font-size:15px;line-height:1;flex:none;user-select:none}
+.card.r{color:var(--red)}.card .c{font-size:26px;text-align:center}.card .b{transform:rotate(180deg)}
 .pl{animation:pop .35s ease-out}@keyframes pop{from{transform:translateY(-40px) scale(.7);opacity:0}to{transform:none;opacity:1}}
 .who{display:block;text-align:center;font-size:11px;color:#d7efe0;margin-top:3px}
-.hand{display:flex;flex-wrap:wrap;justify-content:center;padding:8px 14px 0}
-.hand .card{margin-left:-20px;margin-bottom:6px;transition:transform .15s}
-.hand .ok{outline:2px solid transparent}.hand .ok:active{transform:translateY(-14px);outline-color:var(--gold)}.hand .no{filter:brightness(.6)}
-.me{text-align:center;padding:6px;border-radius:12px;border:2px solid transparent;margin-top:6px;font-size:14px}
+.me{display:flex;align-items:center;justify-content:center;gap:8px;padding:6px;border-radius:12px;border:2px solid transparent;margin-top:6px;font-size:15px}
+.me .av{font-size:28px}
+.hand{margin-top:8px;background:#0003;border-radius:14px;padding:8px 4px 4px}
+.hrow{display:flex;align-items:flex-end;justify-content:center;gap:6px;margin-bottom:2px}
+.hs{width:24px;text-align:center;font-size:24px;color:#fff;padding-bottom:8px}.hs.r{color:#ff7b7b}
+.hr{position:relative}
+.hr .card{position:absolute;width:var(--cw);height:var(--ch);font-size:var(--fs);padding:3px 4px;transition:top .12s,filter .12s;box-shadow:-2px 0 5px #0006}
+.hr .card .c{font-size:calc(var(--cw)*.55)}
+.hr .card.ok{outline:2px solid var(--gold);cursor:pointer}
+.hr .card.no{filter:brightness(.55)}
+.hr .card.sel{outline:3px solid #fff;box-shadow:0 0 16px var(--gold)}
+.bar{display:flex;justify-content:center;align-items:center;gap:10px;margin:8px 0 2px;min-height:44px;flex-wrap:wrap}
+.hint{color:#e7f5ec;font-size:14px;text-align:center}
 .log{font-size:12px;color:var(--mut);text-align:center;margin-top:8px}.win{font-size:26px;color:var(--gold);text-align:center;margin:8px 0}
-@media(max-width:480px){.card{width:50px;height:74px;font-size:14px}.card .c{font-size:26px}.hand .card{margin-left:-24px}}
+@media(min-width:520px){.card{width:58px;height:84px;font-size:17px}.card .c{font-size:30px}}
 </style></head><body>
 <button id="snd" aria-label="Sound on/off">🔊</button>
 <div id="app"></div>
 <script>
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
+const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='';
-try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null;
+try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 /* ---- sounds: all tones are generated in the browser (no audio files, no copyright) ---- */
 let AC=null,mute=false;try{mute=localStorage.getItem('dk_mute')==='1'}catch(e){}
@@ -51,7 +69,7 @@ function tone(f,t,d,type,vol){const o=AC.createOscillator(),g=AC.createGain(),s=
   g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(vol,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+d);o.start(s);o.stop(s+d+.05)}
 function seq(notes,step,type,vol){let t=0;notes.forEach(n=>{tone(n[0],t,n[1]*step,type,vol);t+=n[1]*step});return t}
 function sfx(kind){if(mute||!AC)return;try{
-  if(kind==='start'){const e=seq([[523.25,1],[659.25,1],[783.99,1],[659.25,1],[783.99,1],[1046.5,2],[783.99,1],[1046.5,1],[1318.5,3]],.13,'triangle',.2);}
+  if(kind==='start'){seq([[523.25,1],[659.25,1],[783.99,1],[659.25,1],[783.99,1],[1046.5,2],[783.99,1],[1046.5,1],[1318.5,3]],.13,'triangle',.2)}
   else if(kind==='win'){const e=seq([[392,1],[523.25,1],[659.25,1],[783.99,2],[659.25,1],[783.99,1],[1046.5,3]],.16,'square',.1);[523.25,659.25,783.99,1046.5].forEach(f=>tone(f,e,1.1,'triangle',.12))}
   else if(kind==='sad'){seq([[329.63,2],[311.13,2],[293.66,2],[261.63,5]],.22,'sawtooth',.08)}
 }catch(e){}}
@@ -66,46 +84,80 @@ function connect(){
     if(m.type==='state'){const pg=S&&S.game,ng=m.game;
       if(ng&&ng.first&&(!pg||pg.winner>=0))sfx('start');
       if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const lo=m.players.map((_,i)=>i).sort((a,b)=>ng.counts[b]-ng.counts[a])[0];sfx(m.me===lo&&m.me!==ng.winner?'sad':'win')}
-      S=m;err=''}
+      S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='error'){err=m.text;if(m.left)S=null}
     draw()};
   ws.onclose=()=>setTimeout(connect,1500);
 }
 const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
-function join(){send({type:'join',code:room,name:uname,pid})}
+function join(){send({type:'join',code:room,name:uname,pid,avatar})}
 
 function card(c,cls,x){const s=SU[su(c)],r=rl(rk(c));return `<div class="card ${su(c)>1?'r':''} ${cls||''}" ${x||''}><div>${r}<br>${s}</div><div class="c">${s}</div><div class="b">${r}<br>${s}</div></div>`}
+function plan(n){return n===2?'2 players: 13 cards each (half a deck, picked at random)':n===3?'3 players: 13 cards each (3/4 of a deck, picked at random)':n===4?'4 players: two decks, 26 cards each':n===5?'5 players: two decks, 20 cards each (4 cards set aside)':''}
+
+/* Hand: cards grouped in one row per suit, highest rank first. Tap a highlighted card to select it, then press Play. */
+function handHTML(hand,myTurn,ok){
+  const vw=Math.min(window.innerWidth,760),cw=vw>520?66:54,ch=Math.round(cw*1.42),fs=vw>520?22:19;
+  const W=Math.max(200,vw-96),minStep=cw*.45,per=Math.max(1,Math.floor((W-cw)/minStep)+1),seen={};
+  let h=`<div class="hand" style="--cw:${cw}px;--ch:${ch}px;--fs:${fs}px">`;
+  for(let s=0;s<4;s++){
+    const cs=hand.filter(c=>su(c)===s).sort((a,b)=>rk(b)-rk(a));
+    for(let i=0;i<cs.length;i+=per){
+      const row=cs.slice(i,i+per),step=row.length>1?Math.min(cw*.8,(W-cw)/(row.length-1)):0,w=cw+step*(row.length-1);
+      h+=`<div class="hrow"><span class="hs ${s>1?'r':''}">${i===0?SU[s]:''}</span><div class="hr" style="width:${w}px;height:${ch+16}px">`;
+      row.forEach((c,k)=>{
+        seen[c]=(seen[c]||0)+1;const key=c+'-'+seen[c],can=myTurn&&ok.has(c),isSel=sel===key;
+        h+=card(c,(can?'ok ':myTurn?'no ':'')+(isSel?'sel':''),`data-c="${c}" data-k="${key}" style="left:${k*step}px;top:${isSel?0:can?8:16}px;z-index:${isSel?60:k}"`);
+      });
+      h+='</div></div>';
+    }
+  }
+  return h+'</div>';
+}
 
 function draw(){
-  if(!S){$.innerHTML=`<div class="panel"><h1>♠ ♥ Donkey ♦ ♣</h1><div class="sub">3-player card game. Pick a name, then create a room code and share it with 2 friends, or enter the code they gave you.</div>
+  if(!S){$.innerHTML=`<div class="panel"><h1>♠ ♥ Donkey ♦ ♣</h1><div class="sub">2–5 player card game. Pick a name, then create a room code and share it with your friends, or enter the code they gave you.</div>
     <input id="nm" maxlength="14" placeholder="Your name" value="${esc(uname)}" style="text-transform:none;letter-spacing:0">
     <input id="rc" maxlength="6" placeholder="ROOM CODE" value="${esc(room)}"><button id="jb">Join / Create room</button>
-    <div style="margin-top:10px"><button id="rnd" style="background:#fff3;color:#fff">Make a random code</button></div><div class="err">${esc(err)}</div></div>`;
+    <div style="margin-top:10px"><button id="rnd" class="sec">Make a random code</button></div><div class="err">${esc(err)}</div></div>`;
     document.getElementById('rnd').onclick=()=>{document.getElementById('rc').value=Math.random().toString(36).slice(2,6).toUpperCase()};
     document.getElementById('jb').onclick=()=>{uname=document.getElementById('nm').value.trim();room=document.getElementById('rc').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
       if(!uname||!room){err='Enter your name and a room code.';return draw()}
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
-  if(!S.game){let h=`<div class="panel"><h1>Room ${esc(S.room)}</h1><div class="sub">Share this room code with your friends (${S.players.length}/3 seated)</div>`;
-    S.players.forEach(p=>h+=`<div class="seat">🃏 ${esc(p.name)}${p.online?'':' (offline)'}</div>`);
-    h+=S.players.length<2?'<p class="sub">Waiting for more players…</p>':(S.players.length<3?'<p class="sub">Waiting for a 3rd player, or start now with 2.</p>':'')+`<button id="st">Deal the cards (${S.players.length} players)</button>`;
-    $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
-  const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players;
-  const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<br>${g.counts[i]} card${g.counts[i]==1?'':'s'}<div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],10))}</div></div>`;
+  if(!S.game){const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
+    let h=`<div class="panel"><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div class="sub">${n}/5 players seated</div>`;
+    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.online?'':' (offline)'}</span></div>`);
+    h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
+    AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
+    h+='</div>';
+    h+=n<2?'<p class="sub">Waiting for more players…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
+    $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;
+    $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
+    const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
+  const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
+  const ok=new Set(g.ok);
+  if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
+  const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
   let h=`<div class="table"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center">`;
-  if(g.trick.length)g.trick.forEach(t=>h+=`<div>${card(t.c,'pl')}<span class="who">${esc(P[t.p].name)}${t.off?' (gave)':''}</span></div>`);
-  else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
+  if(g.trick.length)g.trick.forEach(t=>h+=`<div>${card(t.c,'pl')}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
+  else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   h+='</div>';
   if(g.winner>=0){const lo=P.map((_,i)=>i).sort((a,b)=>g.counts[b]-g.counts[a])[0];
-    h+=`<div class="win">🏆 ${esc(P[g.winner].name)} finished first!</div><div class="msg">🫏 ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div style="text-align:center"><button id="ag">Play again</button></div>`}
-  else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><b>${my?'👉 Your turn':esc(P[g.turn].name)+'’s turn'}</b></div>`;
-  h+=`<div class="me ${my?'turn':''}">${esc(P[me].name)} (you) · ${g.hand.length} cards</div><div class="hand">`;
-  const ok=new Set(g.ok),hand=g.hand.slice().sort((a,b)=>su(a)-su(b)||rk(b)-rk(a));
-  hand.forEach(c=>h+=card(c,my&&ok.has(c)?'ok':'no',`data-c="${c}"`));
-  h+='</div>';
-  if(my&&g.trick.length&&!hand.some(c=>su(c)===g.lead))h+=`<div class="log">No ${SU[g.lead]}? Pick any card. ${esc(P[g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p].name)} (highest card so far) will pick up all the cards on the table.</div>`;
-  $.innerHTML=h+`</div><div class="err" style="text-align:center">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the player with the highest card of that round picks up all cards on the table.</div>`;
-  $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>send({type:'play',card:+e.dataset.c}));
+    h+=`<div class="win">🏆 ${av(g.winner)} ${esc(P[g.winner].name)} finished first!</div><div class="msg">🫏 ${av(lo)} ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div style="text-align:center"><button id="ag">Play again</button></div>`}
+  else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><b>${my?'👉 Your turn':av(g.turn)+' '+esc(P[g.turn].name)+'’s turn'}</b></div>`;
+  h+=`<div class="me ${my?'turn':''}"><span class="av">${av(me)}</span><span>${esc(P[me].name)} (you) · ${g.hand.length} cards</span></div>`;
+  if(g.winner<0){
+    if(my&&sel!==null){const c=parseInt(sel,10);h+=`<div class="bar"><button id="pl">Play ${rl(rk(c))}${SU[su(c)]}</button><button id="cx" class="sec">Cancel</button></div>`}
+    else if(my)h+=`<div class="bar"><div class="hint">${g.trick.length&&!g.hand.some(c=>su(c)===g.lead)?`No ${SU[g.lead]}? Tap any card. ${av(g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p)} ${esc(P[g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p].name)} (highest so far) will pick up all the cards on the table.`:'Tap a glowing card, then press Play.'}</div></div>`;
+    else h+='<div class="bar"><div class="hint">Waiting for '+esc(P[g.turn].name)+'…</div></div>';
+  }
+  h+=handHTML(g.hand,my,ok);
+  $.innerHTML=h+`</div><div class="err">${esc(err)}</div><div class="log">Follow the lead suit if you can. If everyone follows suit, the highest card leads next round. If someone has no card of that suit, the player with the highest card of that round picks up all cards on the table.</div>`;
+  $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.k?null:e.dataset.k;draw()});
+  const pl=document.getElementById('pl');if(pl)pl.onclick=()=>{const c=parseInt(sel,10);sel=null;send({type:'play',card:c})};
+  const cx=document.getElementById('cx');if(cx)cx.onclick=()=>{sel=null;draw()};
   const a=document.getElementById('ag');if(a)a.onclick=()=>send({type:'again'});
 }
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(draw,150)});
 connect();draw();
 </script></body></html>
