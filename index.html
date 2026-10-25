@@ -33,7 +33,7 @@ button:disabled{opacity:.4}
 .avs button:active{transform:scale(.9)}.avs button.mine{background:linear-gradient(180deg,#ffd75e,#e8a91c);box-shadow:0 0 14px var(--gold)}.avs button.taken{opacity:.25}
 .code{display:inline-block;font-size:34px;letter-spacing:8px;font-weight:900;padding:4px 10px 4px 18px;border:2px dashed #f5c54299;border-radius:12px;background:#0007;color:var(--gold)}
 .err{color:#ffb4a8;min-height:20px;font-size:14px;text-align:center}
-.table{position:relative;max-width:760px;margin:0 auto;border-radius:34px;padding:14px;background:radial-gradient(ellipse at 50% 40%,#22a463 0%,var(--felt) 38%,var(--felt2) 100%);box-shadow:0 0 0 6px #5a3b1e,0 0 0 9px #9a6a30,0 0 0 11px #2e1a08,0 20px 44px #000c,inset 0 0 70px #000b,inset 0 0 0 2px #f5c54238}
+.table{position:relative;display:flex;flex-direction:column;max-width:760px;margin:0 auto;border-radius:34px;padding:14px;background:radial-gradient(ellipse at 50% 40%,#22a463 0%,var(--felt) 38%,var(--felt2) 100%);box-shadow:0 0 0 6px #5a3b1e,0 0 0 9px #9a6a30,0 0 0 11px #2e1a08,0 20px 44px #000c,inset 0 0 70px #000b,inset 0 0 0 2px #f5c54238}
 .table::before{content:"";position:absolute;inset:0;border-radius:inherit;background:repeating-radial-gradient(circle at 20% 30%,#ffffff07 0 1px,transparent 1px 3px);pointer-events:none}
 .table>*{position:relative}
 .top{display:flex;flex-wrap:wrap;gap:8px}
@@ -45,7 +45,7 @@ button:disabled{opacity:.4}
 @keyframes glow{from{box-shadow:0 0 8px #f5c54255}to{box-shadow:0 0 22px #f5c542cc}}
 .fan{display:flex;justify-content:center;margin-top:5px;height:28px}
 .back{width:20px;height:28px;border-radius:4px;margin-left:-12px;background:repeating-linear-gradient(45deg,#8e1b2c 0 3px,#b8283c 3px 6px);border:2px solid #fff;box-shadow:0 1px 3px #0009}
-.center{min-height:112px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:6px;border-radius:50%/42%;background:radial-gradient(ellipse at center,#00000038,transparent 72%);border:2px dashed #f5c54230}
+.center{flex:1 1 auto;min-height:112px;display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0;padding:6px;border-radius:50%/42%;background:radial-gradient(ellipse at center,#00000038,transparent 72%);border:2px dashed #f5c54230}
 .center.dense{gap:0}.center.dense>div{margin-left:-26px}.center.dense>div:first-child{margin-left:0}.center.dense .who{display:none}
 .center>div:nth-child(odd) .card{rotate:-3deg}.center>div:nth-child(even) .card{rotate:3deg}
 .msg{text-align:center;font-size:15px;min-height:22px;margin:5px 0;text-shadow:0 1px 2px #0008}
@@ -93,6 +93,7 @@ button:disabled{opacity:.4}
 .cl{overflow:auto;min-height:110px;max-height:34vh;font-size:14px;line-height:1.4;padding:4px 2px}
 .cl .m{margin:5px 0;word-break:break-word}.cl .m b{color:#ffe08a}.cl .m.me{text-align:right}.cl .m.me b{color:#9ff0b8}
 .cr{display:flex;gap:8px}.cr input{margin:0;text-transform:none;letter-spacing:0;font-size:16px;text-align:left;flex:1}.cr button{padding:10px 16px}
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:130;background:#000d;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;box-shadow:0 4px 14px #000a}
 #vc{position:fixed;top:max(8px,env(safe-area-inset-top));left:58px;z-index:99;width:40px;height:40px;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:20px;text-decoration:none;background:#5865f2;box-shadow:inset 0 0 0 2px #fff6,0 3px 8px #0008}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
 .ov{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:16px;background:#000c}.ov[hidden]{display:none}
@@ -133,6 +134,7 @@ button:disabled{opacity:.4}
 <div class="cr"><input id="ci" maxlength="200" placeholder="Type a message…" autocomplete="off"><button id="csnd">Send</button></div>
 </div>
 <a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
+<div id="toast" style="display:none"></div>
 <div id="app"></div>
 <script>
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
@@ -164,6 +166,15 @@ sb.onclick=()=>{mute=!mute;sb.textContent=mute?'🔇':'🔊';try{localStorage.se
 function rain(list){try{const d=document.createElement('div');d.className='rain';for(let i=0;i<36;i++){const s=document.createElement('span');s.textContent=list[i%list.length];s.style.cssText=`left:${Math.random()*100}%;animation-duration:${2.5+Math.random()*2.5}s;animation-delay:${Math.random()*1.2}s;font-size:${18+Math.random()*22}px`;d.appendChild(s)}document.body.appendChild(d);setTimeout(()=>d.remove(),6500)}catch(e){}}
 const HERO='<div class="hero">'+[[12,-24],[25,-8],[38,8],[51,24]].map((x,i)=>card(x[0],'','style="rotate:'+x[1]+'deg;animation-delay:'+i*.25+'s"')).join('')+'</div>';
 const LOGO='<div class="logo">DONKEY</div><div class="suits"><span>♠</span><span class="r">♥</span><span>♣</span><span class="r">♦</span></div>';
+const cleanCode=t=>String(t||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
+let invited='';try{invited=cleanCode(new URLSearchParams(location.search||'').get('room'));if(invited)room=invited}catch(e){}
+const inviteUrl=code=>(location.origin||('https://'+location.host))+'/?room='+encodeURIComponent(code);
+function toast(t){const e=document.getElementById('toast');if(!e||!e.style)return;e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>{e.style.display='none'},2200)}
+async function shareInvite(code){
+  const url=inviteUrl(code);
+  try{if(navigator.share){await navigator.share({title:'Donkey card game',text:'Join my Donkey card game! Room code: '+code,url});return}}catch(e){if(e&&e.name==='AbortError')return}
+  try{await navigator.clipboard.writeText(url);toast('Invite link copied!')}catch(e){try{prompt('Copy this invite link:',url)}catch(e2){}}
+}
 if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
 const infoBtn=document.getElementById('info'),rulesEl=document.getElementById('rules');
@@ -225,16 +236,17 @@ function handHTML(hand,myTurn,ok){
 }
 
 function render(){
-  if(!S){$.innerHTML=`<div class="panel">${HERO}${LOGO}<div class="sub">2–5 player card game (play alone against bots too). Pick a name, then create a room code and share it with friends, or enter the code they gave you.</div>
+  if(!S){$.innerHTML=`<div class="panel">${HERO}${LOGO}<div class="sub">${invited?'🎉 You are invited to room <b>'+esc(invited)+'</b>. Enter your name and tap Join.':'2–5 player card game (play alone against bots too). Pick a name, then create a room code and share it with friends, or enter the code they gave you.'}</div>
     <input id="nm" maxlength="14" placeholder="Your name" value="${esc(uname)}" style="text-transform:none;letter-spacing:0">
     <input id="rc" maxlength="6" placeholder="ROOM CODE" value="${esc(room)}"><button id="jb">Join / Create room</button>
-    <div style="margin-top:10px"><button id="rnd" class="sec">Make a random code</button></div><div class="err">${esc(err)}</div></div>`;
+    <div style="margin-top:10px"><button id="rnd" class="sec">Make a random code</button></div><div style="margin-top:10px"><button id="inv" class="sec">🔗 Share invite link</button></div><div class="err">${esc(err)}</div></div>`;
     document.getElementById('rnd').onclick=()=>{document.getElementById('rc').value=Math.random().toString(36).slice(2,6).toUpperCase()};
+    document.getElementById('inv').onclick=()=>{const rc=document.getElementById('rc');let c=cleanCode(rc.value);if(!c){c=Math.random().toString(36).slice(2,6).toUpperCase();rc.value=c}shareInvite(c)};
     document.getElementById('jb').onclick=()=>{uname=document.getElementById('nm').value.trim();room=document.getElementById('rc').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
       if(!uname||!room){err='Enter your name and a room code.';return draw()}
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
   if(!S.game){winAt=0;prevTL=0;const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
-    let h=`<div class="panel"><div class="logo sm">DONKEY</div><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div class="sub">${n}/5 players seated</div>`;
+    let h=`<div class="panel"><div class="logo sm">DONKEY</div><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div style="margin:8px 0"><button id="inv2" class="sec">🔗 Invite friends</button></div><div class="sub">${n}/5 players seated</div>`;
     S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.bot?' (bot · '+(p.level||'easy')+')':''}${p.online?'':' (offline)'}</span></div>`);
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
@@ -246,6 +258,7 @@ function render(){
     $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button></div>`;
     document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;voiceUrl='';err='';sel=null;winAt=0;prevTL=0;draw()};
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
+    const iv2=document.getElementById('inv2');if(iv2)iv2.onclick=()=>shareInvite(S.room);
     const vs=document.getElementById('vs');if(vs)vs.onclick=()=>send({type:'voice',url:document.getElementById('vu').value});
     const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot',level:botLevel});
     $.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{botLevel=b.dataset.l;try{localStorage.setItem('dk_lvl',botLevel)}catch(e){}draw()});
@@ -255,7 +268,7 @@ function render(){
   const ok=new Set(g.ok);tableMode=true;winAt=g.winner>=0?(winAt||Date.now()):0;
   if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
   const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
-  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
+  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}" style="min-height:${Math.max(300,(window.innerHeight||800)-64)}px"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
   if(g.trick.length)g.trick.forEach((t,ti)=>h+=`<div>${card(t.c,ti>=prevTL?'pl':'')}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   prevTL=g.trick.length;
@@ -270,7 +283,7 @@ function render(){
     else h+='<div class="bar"><div class="hint">Waiting for '+esc(P[g.turn].name)+'…</div></div>';
   }
   h+=handHTML(g.hand,my,ok);
-  $.innerHTML=h+`</div><div class="err">${esc(err)}</div><div class="log">Follow the lead suit if you can. When everyone has played a card of the same suit, the round ends, those cards are set aside and the highest card leads next. If someone has no card of that suit, they play any card and the player with the highest card of that suit in the round picks up all the cards on the table.</div>`;
+  $.innerHTML=h+`</div><div class="err">${esc(err)}</div></div>`;
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.k?null:e.dataset.k;draw()});
   const pl=document.getElementById('pl');if(pl)pl.onclick=()=>{const c=parseInt(sel,10);sel=null;send({type:'play',card:c})};
   const cx=document.getElementById('cx');if(cx)cx.onclick=()=>{sel=null;draw()};
