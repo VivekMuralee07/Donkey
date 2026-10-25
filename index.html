@@ -214,7 +214,6 @@ const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 function join(){send({type:'join',code:room,name:uname,pid,avatar})}
 
 function card(c,cls,x){const s=SU[su(c)],r=rl(rk(c));return `<div class="card ${su(c)>1?'r':''} ${rk(c)>=11&&rk(c)<=13?'f':rk(c)===14?'a':''} ${cls||''}" ${x||''}><div class="i"><span class="rk">${r}</span><span class="st">${s}</span></div><div class="c">${s}</div></div>`}
-function plan(n){return n===2?'2 players: 39 cards (3/4 of a deck, picked at random), 19 or 20 each':n===3?'3 players: 39 cards (3/4 of a deck, picked at random), 13 each':n===4?'4 players: the full deck of 52, 13 cards each':n===5?'5 players: the full deck of 52, 10 or 11 cards each':''}
 
 /* Hand: cards grouped in one row per suit, highest rank first. Tap a highlighted card to select it, then press Play. */
 function handHTML(hand,myTurn,ok){
@@ -252,8 +251,8 @@ function render(){
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
     h+='</div>';
     const hasBot=S.players.some(p=>p.bot);
-    h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Easy plays random cards, Medium plays it safe, Hard remembers cards, plans ahead and learns how each player plays.</div><div class="sub" style="margin-top:-6px">🧠 Bots have learned from ${S.learned||0} finished game${S.learned===1?'':'s'}.</div>`;
-    h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
+    h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div>`;
+    h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<button id="st" style="margin-top:12px">Deal the cards (${n} players)</button>`;
     $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button><div style="margin-top:18px"><input id="vu" placeholder="https://discord.gg/yourinvite" value="${esc(S.voice||'')}" style="text-transform:none;letter-spacing:0;font-size:14px"><button id="vs" class="sec">Save voice link</button><div class="sub" style="margin-top:10px">🎧 Voice chat (Discord)</div><div class="sub">${S.voice?'Voice link is set. Tap the blue 🎧 button (top-left) to join.':'In Discord: open your voice channel, tap Invite, copy the link and paste it above.'}</div></div></div>`;
     document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;voiceUrl='';err='';sel=null;winAt=0;prevTL=0;draw()};
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
