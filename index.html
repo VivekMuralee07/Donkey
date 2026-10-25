@@ -123,7 +123,7 @@ button:disabled{opacity:.4}
 <li><b>No card of that suit:</b> you play any card and the round stops right there. The player with the highest card of the led suit picks up all the cards on the table and leads next.</li>
 <li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. The player left with the most cards is the Donkey 🫏.</li>
 <li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
-<li><b>After the game:</b> everyone returns to the lobby after a few seconds. There you can change avatars, add bots and deal again.</li>
+<li><b>After the game:</b> tap Back to lobby when you are ready. There you can change avatars, add bots and deal again.</li>
 <li><b>Chat:</b> tap the 💬 button to type messages to the other players in your room.</li>
 <li><b>Voice chat:</b> tap the blue 🎧 button to join your group's Discord voice channel. Paste the invite link on the room screen first.</li>
 </ul></div></div>
@@ -251,11 +251,10 @@ function render(){
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
     h+='</div>';
-    h+=`<div class="sub" style="margin-top:6px">🎧 Voice chat (Discord)</div><div class="sub" style="margin:-6px 0 6px">${S.voice?'Voice link is set. Tap the blue 🎧 button (top-left) to join.':'In Discord: open your voice channel, tap Invite, copy the link and paste it here.'}</div><input id="vu" placeholder="https://discord.gg/yourinvite" value="${esc(S.voice||'')}" style="text-transform:none;letter-spacing:0;font-size:14px"><button id="vs" class="sec">Save voice link</button>`;
     const hasBot=S.players.some(p=>p.bot);
     h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Easy plays random cards, Medium plays it safe, Hard remembers cards, plans ahead and learns how each player plays.</div><div class="sub" style="margin-top:-6px">🧠 Bots have learned from ${S.learned||0} finished game${S.learned===1?'':'s'}.</div>`;
     h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
-    $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button></div>`;
+    $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button><div style="margin-top:18px"><input id="vu" placeholder="https://discord.gg/yourinvite" value="${esc(S.voice||'')}" style="text-transform:none;letter-spacing:0;font-size:14px"><button id="vs" class="sec">Save voice link</button><div class="sub" style="margin-top:10px">🎧 Voice chat (Discord)</div><div class="sub">${S.voice?'Voice link is set. Tap the blue 🎧 button (top-left) to join.':'In Discord: open your voice channel, tap Invite, copy the link and paste it above.'}</div></div></div>`;
     document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;voiceUrl='';err='';sel=null;winAt=0;prevTL=0;draw()};
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
     const iv2=document.getElementById('inv2');if(iv2)iv2.onclick=()=>shareInvite(S.room);
@@ -274,7 +273,7 @@ function render(){
   prevTL=g.trick.length;
   h+='</div>';
   if(g.winner>=0){const lo=P.map((_,i)=>i).sort((a,b)=>g.counts[b]-g.counts[a])[0];
-    h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} ${g.early?'wins!':'finished first!'}</div>${g.early?`<div class="msg">${esc(g.msg)}</div>`:''}<div class="msg donk"><span class="don">🫏</span> ${av(lo)} ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div class="msg" style="font-size:13px">Back to the lobby in <b id="cd">${Math.max(0,Math.ceil(10-(Date.now()-winAt)/1000))}</b>s</div><div style="text-align:center"><button id="ag">Back to lobby now</button></div>`}
+    h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} ${g.early?'wins!':'finished first!'}</div>${g.early?`<div class="msg">${esc(g.msg)}</div>`:''}<div class="msg donk"><span class="don">🫏</span> ${av(lo)} ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div style="text-align:center"><button id="ag">Back to lobby</button></div>`}
   else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><span class="pill ${my?'mine':''}">${my?'👉 Your turn':av(g.turn)+' '+esc(P[g.turn].name)+'’s turn'}</span></div>`;
   h+=`<div class="me ${my?'turn':''}"><span class="av">${av(me)}</span><span>${esc(P[me].name)} (you) · ${g.hand.length} cards</span></div>`;
   if(g.winner<0){
@@ -302,7 +301,6 @@ function draw(){
   if(cb.style){cb.style.display=S?'flex':'none';if(!S){chatEl.hidden=true;chatMsgs=[];unread=0}}
   const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
-setInterval(()=>{const e=document.getElementById('cd');if(e&&winAt)e.textContent=Math.max(0,Math.ceil(10-(Date.now()-winAt)/1000))},300);
 document.addEventListener('focusout',()=>{if(pendingDraw)setTimeout(()=>{if(!typingInApp())draw()},400)});
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tableMode)draw()},150)});
 connect();draw();

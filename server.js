@@ -12,7 +12,6 @@ const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['ð
 // Optional Discord voice-chat invite. Set DISCORD_INVITE on Render to give every room a default link; players can also paste one per room.
 const VOICE_RE = /^https:\/\/(discord\.gg|(www\.)?discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,40}$/;
 const DEFAULT_VOICE = VOICE_RE.test(process.env.DISCORD_INVITE || '') ? process.env.DISCORD_INVITE : '';
-const LOBBY_MS = Number(process.env.LOBBY_MS) || 10000; // time to show the result before returning to the lobby
 const BOT_MS = Number(process.env.BOT_MS) || 1000;
 
 const server = http.createServer((req, res) => {
@@ -34,7 +33,6 @@ function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.fl
 // Cards are dealt one by one; when the count does not divide evenly, a random player gets the extra card(s).
 // The Ace of Spades is always among the dealt cards, so someone can start.
 function newGame(room) {
-  clearTimeout(room.lobbyTimer); room.lobbyTimer = null;
   const n = room.players.length;
   const total = n <= 3 ? 39 : 52;
   let hands;
@@ -291,9 +289,8 @@ function checkEarly(room) {
   g.winner = y; g.early = true;
   g.msg = room.players[y].name + ' has no ' + SYM[s] + ' while ' + room.players[x].name + ' holds only ' + SYM[s] + '. ' + room.players[y].name + ' wins!';
 }
-// After a game ends, everybody goes back to the lobby (room screen) to change avatars, add bots and deal again.
+// After a game ends the result stays on screen until someone taps "Back to lobby"; then everybody returns to the lobby (room screen) to change avatars, add bots and deal again.
 function toLobby(room) {
-  clearTimeout(room.lobbyTimer); room.lobbyTimer = null;
   room.game = null;
   room.players = room.players.filter(x => x.ws || x.bot);
   if (!room.players.some(p => !p.bot)) { clearTimeout(room.botTimer); rooms.delete(room.code); return; }
@@ -307,7 +304,6 @@ function send(ws, o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o))
 function push(room) {
   room.touched = Date.now();
   if (room.game && room.game.winner >= 0) learnFrom(room);
-  if (room.game && room.game.winner >= 0 && !room.lobbyTimer) room.lobbyTimer = setTimeout(() => { room.lobbyTimer = null; if (room.game && room.game.winner >= 0) toLobby(room); }, LOBBY_MS);
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
