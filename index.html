@@ -132,7 +132,7 @@ body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 <li><b>Follow suit:</b> if you have a card of the suit that was led, you must play one.</li>
 <li><b>Everyone follows suit:</b> when every player has played a card of that suit, the round ends and those cards are set aside. The player with the highest card leads the next round.</li>
 <li><b>No card of that suit:</b> you play any card and the round stops right there. The player with the highest card of the led suit picks up all the cards on the table and leads next.</li>
-<li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. The player left with the most cards is the Donkey 🫏.</li>
+<li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. Among the other players, the one left with the most cards is the Donkey 🫏.</li>
 <li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
 <li><b>After the game:</b> tap Back to lobby when you are ready. There you can change avatars, add bots and deal again.</li>
 <li><b>Voice talk:</b> when two or more real players are in the room, tap 🎙 to join voice. Tap the green 🎤 to mute or unmute your microphone, and 📴 to leave voice. Bots are not part of voice.</li>
@@ -298,6 +298,13 @@ function syncVoice(){   // runs with every state update: drop links to players w
   if(inVoice&&me&&!me.voice&&Date.now()-lastVjoin>2500){Object.keys(peers).forEach(closePeer);lastVjoin=Date.now();send({type:'vjoin'})}
 }
 vjBtn.onclick=joinVoice;micBtn.onclick=toggleMic;vxBtn.onclick=leaveVoice;
+/* The Donkey = the player(s) holding the most cards among everybody except the winner. */
+function donkeys(counts,winner){
+  const rest=counts.map((c,i)=>i).filter(i=>i!==winner);
+  if(!rest.length)return [];
+  const mx=Math.max(...rest.map(i=>counts[i]));
+  return rest.filter(i=>counts[i]===mx);
+}
 function connect(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
   ws.onopen=()=>{if(room&&uname&&S)join();draw()};
@@ -305,7 +312,7 @@ function connect(){
     if(m.type==='state'){const pg=S&&S.game,ng=m.game;recordResult(m);
       if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
       else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
-      if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const lo=m.players.map((_,i)=>i).sort((a,b)=>ng.counts[b]-ng.counts[a])[0];const sad=m.me===lo&&m.me!==ng.winner;sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
+      if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const sad=donkeys(ng.counts,ng.winner).includes(m.me);sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
       voiceUrl=m.voice||'';S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='chatlog'){chatMsgs=m.msgs||[];unread=0;renderChat()}
     else if(m.type==='chat'){chatMsgs.push(m.msg);if(chatMsgs.length>60)chatMsgs.shift();if(chatEl.hidden&&!m.msg.mine)unread++;renderChat()}
@@ -379,8 +386,8 @@ function render(){
   else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   prevTL=g.trick.length;
   h+='</div>';
-  if(g.winner>=0){const lo=P.map((_,i)=>i).sort((a,b)=>g.counts[b]-g.counts[a])[0];
-    h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} ${g.early?'wins!':'finished first!'}</div>${g.early?`<div class="msg">${esc(g.msg)}</div>`:''}<div class="msg donk"><span class="don">🫏</span> ${av(lo)} ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div style="text-align:center"><button id="ag">Back to lobby</button></div>`}
+  if(g.winner>=0){const dk=donkeys(g.counts,g.winner);
+    h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} ${g.early?'wins!':'finished first!'}</div>${g.early?`<div class="msg">${esc(g.msg)}</div>`:''}<div class="msg donk"><span class="don">🫏</span> ${dk.map(i=>av(i)+' '+esc(P[i].name)).join(' and ')} ${dk.length>1?'are the Donkeys':'is the Donkey'} (${g.counts[dk[0]]} cards left)</div><div style="text-align:center"><button id="ag">Back to lobby</button></div>`}
   else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><span class="pill ${my?'mine':''}">${my?'👉 Your turn':av(g.turn)+' '+esc(P[g.turn].name)+'’s turn'}</span></div>`;
   h+=`<div class="me ${my?'turn':''}"><span class="av">${av(me)}</span><span>${esc(P[me].name)} (you) · ${g.hand.length} cards</span></div>`;
   if(g.winner<0){
