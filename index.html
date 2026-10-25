@@ -131,7 +131,7 @@ const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 function join(){send({type:'join',code:room,name:uname,pid,avatar})}
 
 function card(c,cls,x){const s=SU[su(c)],r=rl(rk(c));return `<div class="card ${su(c)>1?'r':''} ${rk(c)>=11&&rk(c)<=13?'f':rk(c)===14?'a':''} ${cls||''}" ${x||''}><div class="i"><span class="rk">${r}</span><span class="st">${s}</span></div><div class="c">${s}</div></div>`}
-function plan(n){return n===2?'2 players: 13 cards each (half a deck, picked at random)':n===3?'3 players: 13 cards each (3/4 of a deck, picked at random)':n===4?'4 players: two decks, 26 cards each':n===5?'5 players: two decks, 20 cards each (4 cards set aside)':''}
+function plan(n){return n===2?'2 players: 39 cards (3/4 of a deck, picked at random), 19 or 20 each':n===3?'3 players: the full deck of 52, 17 or 18 cards each':n===4?'4 players: the full deck of 52, 13 cards each':n===5?'5 players: the full deck of 52, 10 or 11 cards each':''}
 
 /* Hand: cards grouped in one row per suit, highest rank first. Tap a highlighted card to select it, then press Play. */
 function handHTML(hand,myTurn,ok){

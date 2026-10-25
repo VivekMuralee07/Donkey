@@ -26,17 +26,18 @@ const SYM = ['♠', '♣', '♦', '♥'], RL = { 11: 'J', 12: 'Q', 13: 'K', 14: 
 const name = c => (RL[rk(c)] || rk(c)) + SYM[su(c)];
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
-// 2 players: 13 cards each (26 of 52). 3 players: 13 each (39 of 52). 4-5 players: two decks split equally (26 / 20 each).
+// 2 players: 39 cards (75% of a deck). 3-5 players: the full 52-card deck.
+// Cards are dealt one by one; when the count does not divide evenly, a random player gets the extra card(s).
 // The Ace of Spades is always among the dealt cards, so someone can start.
 function newGame(room) {
   const n = room.players.length;
-  const decks = n >= 4 ? 2 : 1, per = n >= 4 ? Math.floor(104 / n) : 13;
+  const total = n === 2 ? 39 : 52;
   let hands;
   do {
-    const pool = [];
-    for (let d = 0; d < decks; d++) for (let c = 0; c < 52; c++) pool.push(c);
-    shuffle(pool);
-    hands = Array.from({ length: n }, (_, i) => pool.slice(i * per, (i + 1) * per));
+    const pool = shuffle([...Array(52).keys()]).slice(0, total);
+    hands = Array.from({ length: n }, () => []);
+    const start = Math.floor(Math.random() * n);
+    pool.forEach((c, i) => hands[(start + i) % n].push(c));
   } while (!hands.some(h => h.includes(ACE_SPADES)));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
   room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [],
