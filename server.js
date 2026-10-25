@@ -9,6 +9,9 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const AVATARS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const MAX_PLAYERS = 5;
 const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['🤖', '👾', '🎃', '🧠', '🛸'];
+// Optional Discord voice-chat invite. Set DISCORD_INVITE on Render to give every room a default link; players can also paste one per room.
+const VOICE_RE = /^https:\/\/(discord\.gg|(www\.)?discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,40}$/;
+const DEFAULT_VOICE = VOICE_RE.test(process.env.DISCORD_INVITE || '') ? process.env.DISCORD_INVITE : '';
 const BOT_MS = Number(process.env.BOT_MS) || 1000;
 
 const server = http.createServer((req, res) => {
@@ -86,6 +89,7 @@ function push(room) {
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
+      voice: room.voice || DEFAULT_VOICE,
       players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot })),
       game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, winner: g.winner, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
@@ -148,6 +152,11 @@ wss.on('connection', ws => {
       if (m.type === 'avatar') {
         if (!room.game && idx >= 0 && AVATARS.includes(m.a) && !room.players.some((q, k) => k !== idx && q.avatar === m.a)) { room.players[idx].avatar = m.a; push(room); }
         return;
+      }
+      if (m.type === 'voice') {
+        const u = String(m.url || '').trim().slice(0, 100);
+        if (idx >= 0 && (u === '' || VOICE_RE.test(u))) { room.voice = u; return push(room); }
+        return send(ws, { type: 'error', text: 'Please paste a Discord invite link, like https://discord.gg/abc123' });
       }
       if (m.type === 'addbot') {
         if (room.game || idx < 0 || room.players.length >= MAX_PLAYERS) return;

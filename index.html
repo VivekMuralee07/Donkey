@@ -84,6 +84,7 @@ button:disabled{opacity:.4}
 .c1 .log,.c2 .log,.c3 .log{display:none}.c1 .center{min-height:92px;margin:4px 0}
 .c2 .opp .av{width:32px;height:32px;font-size:20px}.c2 .fan{display:none}.c2 .center{min-height:70px}.c2 .center .card{width:40px;height:58px;font-size:14px}
 .c3 .table,.table.c3{padding:8px}.c3 .msg{margin:2px 0;min-height:0}.c3 .me .av{width:28px;height:28px;font-size:18px}.c3 .center{min-height:56px;margin:2px 0}.c3 .center .card{width:34px;height:50px;font-size:12px}.c3 .who{display:none}.c3 .opp .cnt{margin-top:0}
+#vc{position:fixed;top:max(8px,env(safe-area-inset-top));left:58px;z-index:99;width:40px;height:40px;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:20px;text-decoration:none;background:#5865f2;box-shadow:inset 0 0 0 2px #fff6,0 3px 8px #0008}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
 .ov{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:16px;background:#000c}.ov[hidden]{display:none}
 .rc{position:relative;max-width:460px;width:100%;max-height:86vh;overflow:auto;text-align:left;padding:20px 18px 16px;border-radius:20px;background:linear-gradient(160deg,#17382a,#0a1d14);border:1px solid #f5c54255;box-shadow:0 18px 50px #000}
@@ -108,13 +109,15 @@ button:disabled{opacity:.4}
 <li><b>Everyone follows suit:</b> when every player has played a card of that suit, the round ends and those cards are set aside. The player with the highest card leads the next round.</li>
 <li><b>No card of that suit:</b> you play any card and the round stops right there. The player with the highest card of the led suit picks up all the cards on the table and leads next.</li>
 <li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. The player left with the most cards is the Donkey 🫏.</li>
+<li><b>Voice chat:</b> tap the blue 🎧 button to join your group's Discord voice channel. Paste the invite link on the room screen first.</li>
 </ul></div></div>
+<a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
 <div id="app"></div>
 <script>
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false;
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='';
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 /* ---- sounds: all tones are generated in the browser (no audio files, no copyright) ---- */
@@ -148,7 +151,7 @@ function connect(){
     if(m.type==='state'){const pg=S&&S.game,ng=m.game;
       if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
       if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const lo=m.players.map((_,i)=>i).sort((a,b)=>ng.counts[b]-ng.counts[a])[0];const sad=m.me===lo&&m.me!==ng.winner;sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
-      S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
+      voiceUrl=m.voice||'';S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='error'){err=m.text;if(m.left)S=null}
     draw()};
   ws.onclose=()=>setTimeout(connect,1500);
@@ -193,11 +196,13 @@ function render(){
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
     h+='</div>';
+    h+=`<div class="sub" style="margin-top:6px">🎧 Voice chat (Discord)</div><div class="sub" style="margin:-6px 0 6px">${S.voice?'Voice link is set. Tap the blue 🎧 button (top-left) to join.':'In Discord: open your voice channel, tap Invite, copy the link and paste it here.'}</div><input id="vu" placeholder="https://discord.gg/yourinvite" value="${esc(S.voice||'')}" style="text-transform:none;letter-spacing:0;font-size:14px"><button id="vs" class="sec">Save voice link</button>`;
     const hasBot=S.players.some(p=>p.bot);
     h+=`<div style="margin:4px 0">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Bots are easy level and play random legal cards.</div>`;
     h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
     $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
+    const vs=document.getElementById('vs');if(vs)vs.onclick=()=>send({type:'voice',url:document.getElementById('vu').value});
     const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot'});
     const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
     const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
@@ -233,6 +238,7 @@ function draw(){
   for(;;){animHand=a;prevTL=p;tableMode=false;render();if(!tableMode||lvl>=6||fits())break;lvl++}
   animHand=false;
   if(infoBtn.style)infoBtn.style.display=tableMode?'none':'flex';
+  const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(draw,150)});
 connect();draw();
