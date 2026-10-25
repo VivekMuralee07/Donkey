@@ -119,7 +119,7 @@ button:disabled{opacity:.4}
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0;
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0,pendingDraw=false;
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 /* ---- sounds: all tones are generated in the browser (no audio files, no copyright) ---- */
@@ -236,6 +236,10 @@ function render(){
 function fits(){try{return $.getBoundingClientRect().bottom+(window.scrollY||0)+14<=window.innerHeight}catch(e){return true}}
 /* Draw the table; if it is taller than the screen, shrink cards and spacing step by step until it fits (no scrolling). */
 function draw(){
+  /* Never rebuild the screen while someone is typing: it would destroy the input and close the keyboard. */
+  const ae=document.activeElement;
+  if(ae&&ae.tagName==='INPUT'){pendingDraw=true;return}
+  pendingDraw=false;
   const a=animHand,p=prevTL;lvl=0;
   for(;;){animHand=a;prevTL=p;tableMode=false;render();if(!tableMode||lvl>=6||fits())break;lvl++}
   animHand=false;
@@ -243,6 +247,7 @@ function draw(){
   const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
 setInterval(()=>{const e=document.getElementById('cd');if(e&&winAt)e.textContent=Math.max(0,Math.ceil(10-(Date.now()-winAt)/1000))},300);
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(draw,150)});
+document.addEventListener('focusout',()=>{if(pendingDraw)setTimeout(()=>{const x=document.activeElement;if(!(x&&x.tagName==='INPUT'))draw()},400)});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tableMode)draw()},150)});
 connect();draw();
 </script></body></html>
