@@ -109,6 +109,8 @@ button:disabled{opacity:.4}
 <li><b>Everyone follows suit:</b> when every player has played a card of that suit, the round ends and those cards are set aside. The player with the highest card leads the next round.</li>
 <li><b>No card of that suit:</b> you play any card and the round stops right there. The player with the highest card of the led suit picks up all the cards on the table and leads next.</li>
 <li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. The player left with the most cards is the Donkey 🫏.</li>
+<li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
+<li><b>After the game:</b> everyone returns to the lobby after a few seconds. There you can change avatars, add bots and deal again.</li>
 <li><b>Voice chat:</b> tap the blue 🎧 button to join your group's Discord voice channel. Paste the invite link on the room screen first.</li>
 </ul></div></div>
 <a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
@@ -117,7 +119,7 @@ button:disabled{opacity:.4}
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='';
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0;
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 /* ---- sounds: all tones are generated in the browser (no audio files, no copyright) ---- */
@@ -190,7 +192,7 @@ function render(){
     document.getElementById('jb').onclick=()=>{uname=document.getElementById('nm').value.trim();room=document.getElementById('rc').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
       if(!uname||!room){err='Enter your name and a room code.';return draw()}
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
-  if(!S.game){const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
+  if(!S.game){winAt=0;prevTL=0;const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
     let h=`<div class="panel"><div class="logo sm">DONKEY</div><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div class="sub">${n}/5 players seated</div>`;
     S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.bot?' (bot)':''}${p.online?'':' (offline)'}</span></div>`);
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
@@ -207,7 +209,7 @@ function render(){
     const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
     const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
   const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
-  const ok=new Set(g.ok);tableMode=true;
+  const ok=new Set(g.ok);tableMode=true;winAt=g.winner>=0?(winAt||Date.now()):0;
   if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
   const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
   let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
@@ -216,7 +218,7 @@ function render(){
   prevTL=g.trick.length;
   h+='</div>';
   if(g.winner>=0){const lo=P.map((_,i)=>i).sort((a,b)=>g.counts[b]-g.counts[a])[0];
-    h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} finished first!</div><div class="msg donk"><span class="don">🫏</span> ${av(lo)} ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div style="text-align:center"><button id="ag">Play again</button></div>`}
+    h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} ${g.early?'wins!':'finished first!'}</div>${g.early?`<div class="msg">${esc(g.msg)}</div>`:''}<div class="msg donk"><span class="don">🫏</span> ${av(lo)} ${esc(P[lo].name)} is the Donkey (${g.counts[lo]} cards left)</div><div class="msg" style="font-size:13px">Back to the lobby in <b id="cd">${Math.max(0,Math.ceil(10-(Date.now()-winAt)/1000))}</b>s</div><div style="text-align:center"><button id="ag">Back to lobby now</button></div>`}
   else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><span class="pill ${my?'mine':''}">${my?'👉 Your turn':av(g.turn)+' '+esc(P[g.turn].name)+'’s turn'}</span></div>`;
   h+=`<div class="me ${my?'turn':''}"><span class="av">${av(me)}</span><span>${esc(P[me].name)} (you) · ${g.hand.length} cards</span></div>`;
   if(g.winner<0){
@@ -229,7 +231,7 @@ function render(){
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.k?null:e.dataset.k;draw()});
   const pl=document.getElementById('pl');if(pl)pl.onclick=()=>{const c=parseInt(sel,10);sel=null;send({type:'play',card:c})};
   const cx=document.getElementById('cx');if(cx)cx.onclick=()=>{sel=null;draw()};
-  const a=document.getElementById('ag');if(a)a.onclick=()=>send({type:'again'});
+  const a=document.getElementById('ag');if(a)a.onclick=()=>send({type:'lobby'});
 }
 function fits(){try{return $.getBoundingClientRect().bottom+(window.scrollY||0)+14<=window.innerHeight}catch(e){return true}}
 /* Draw the table; if it is taller than the screen, shrink cards and spacing step by step until it fits (no scrolling). */
@@ -240,6 +242,7 @@ function draw(){
   if(infoBtn.style)infoBtn.style.display=tableMode?'none':'flex';
   const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
+setInterval(()=>{const e=document.getElementById('cd');if(e&&winAt)e.textContent=Math.max(0,Math.ceil(10-(Date.now()-winAt)/1000))},300);
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(draw,150)});
 connect();draw();
 </script></body></html>

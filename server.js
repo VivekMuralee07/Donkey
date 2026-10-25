@@ -12,6 +12,7 @@ const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['ð
 // Optional Discord voice-chat invite. Set DISCORD_INVITE on Render to give every room a default link; players can also paste one per room.
 const VOICE_RE = /^https:\/\/(discord\.gg|(www\.)?discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,40}$/;
 const DEFAULT_VOICE = VOICE_RE.test(process.env.DISCORD_INVITE || '') ? process.env.DISCORD_INVITE : '';
+const LOBBY_MS = Number(process.env.LOBBY_MS) || 10000; // time to show the result before returning to the lobby
 const BOT_MS = Number(process.env.BOT_MS) || 1000;
 
 const server = http.createServer((req, res) => {
@@ -33,6 +34,7 @@ function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.fl
 // Cards are dealt one by one; when the count does not divide evenly, a random player gets the extra card(s).
 // The Ace of Spades is always among the dealt cards, so someone can start.
 function newGame(room) {
+  clearTimeout(room.lobbyTimer); room.lobbyTimer = null;
   const n = room.players.length;
   const total = n <= 3 ? 39 : 52;
   let hands;
@@ -53,7 +55,7 @@ function playable(g, i) {
   const f = h.filter(c => su(c) === g.lead);
   return f.length ? f : h;
 }
-function play(room, i, c) {
+function playCore(room, i, c) {
   const g = room.game, P = room.players, n = P.length;
   if (!g || g.winner >= 0 || g.turn !== i || !playable(g, i).includes(c)) return false;
   g.hands[i].splice(g.hands[i].indexOf(c), 1);
@@ -81,18 +83,46 @@ function play(room, i, c) {
   return true;
 }
 
+function play(room, i, c) { if (!playCore(room, i, c)) return false; checkEarly(room); return true; }
+
+// Early finish: the player whose turn it is holds cards of ONE suit only, and has to play that suit
+// (leading it, or following it). If the next player has none of that suit, the game ends and the next player wins.
+function checkEarly(room) {
+  const g = room.game, n = room.players.length;
+  if (!g || g.winner >= 0) return;
+  const x = g.turn, hand = g.hands[x];
+  if (!hand.length) return;
+  const s = su(hand[0]);
+  if (!hand.every(c => su(c) === s)) return;
+  if (g.trick.length && g.lead !== s) return;   // x must follow a different suit, so the rule does not apply
+  if (g.trick.length + 1 >= n) return;          // x is last to play: the round simply ends with x's card
+  const y = (x + 1) % n;
+  if (!g.hands[y].length || g.hands[y].some(c => su(c) === s)) return;
+  g.winner = y; g.early = true;
+  g.msg = room.players[y].name + ' has no ' + SYM[s] + ' while ' + room.players[x].name + ' holds only ' + SYM[s] + '. ' + room.players[y].name + ' wins!';
+}
+// After a game ends, everybody goes back to the lobby (room screen) to change avatars, add bots and deal again.
+function toLobby(room) {
+  clearTimeout(room.lobbyTimer); room.lobbyTimer = null;
+  room.game = null;
+  room.players = room.players.filter(x => x.ws || x.bot);
+  if (!room.players.some(p => !p.bot)) { clearTimeout(room.botTimer); rooms.delete(room.code); return; }
+  push(room);
+}
+
 // ---------- rooms ----------
 const rooms = new Map(); // code -> { code, players:[{sub,name,ws}], game, touched }
 function send(ws, o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function push(room) {
   room.touched = Date.now();
+  if (room.game && room.game.winner >= 0 && !room.lobbyTimer) room.lobbyTimer = setTimeout(() => { room.lobbyTimer = null; if (room.game && room.game.winner >= 0) toLobby(room); }, LOBBY_MS);
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
       voice: room.voice || DEFAULT_VOICE,
       players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot })),
       game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
-        turn: g.turn, lead: g.lead, first: g.first, winner: g.winner, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
+        turn: g.turn, lead: g.lead, first: g.first, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
   schedBot(room);
 }
@@ -169,10 +199,11 @@ wss.on('connection', ws => {
         for (let k = room.players.length - 1; k >= 0; k--) if (room.players[k].bot) { room.players.splice(k, 1); break; }
         return push(room);
       }
-      if (m.type === 'start' || m.type === 'again') {
+      if (m.type === 'lobby' || m.type === 'again') { if (room.game && room.game.winner >= 0) toLobby(room); return; }
+      if (m.type === 'start') {
         if (room.players.length < 2) return send(ws, { type: 'error', text: 'Need at least 2 players.' });
-        if (room.game && room.game.winner < 0) return;
-        newGame(room); return push(room);
+        if (room.game) return;
+        newGame(room); checkEarly(room); return push(room);
       }
       if (m.type === 'play' && play(room, idx, m.card)) return push(room);
     } catch (e) { console.error(e); }
