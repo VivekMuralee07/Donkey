@@ -43,7 +43,7 @@ function newGame(room) {
     pool.forEach((c, i) => hands[(start + i) % n].push(c));
   } while (!hands.some(h => h.includes(ACE_SPADES)));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
-  room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []), obs: Array.from({ length: n }, () => newStats()),
+  room.game = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []), obs: Array.from({ length: n }, () => newStats()),
     msg: room.players[first].name + ' holds the Ace of Spades and starts.' };
 }
 function playable(g, i) {
@@ -309,7 +309,7 @@ function push(room) {
     send(p.ws, { type: 'state', room: room.code, me: idx,
       voice: room.voice || DEFAULT_VOICE, learned: learn.games,
       players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
-      game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
+      game: g && { gid: g.id, counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
   schedBot(room);

@@ -93,6 +93,13 @@ button:disabled{opacity:.4}
 .cl{overflow:auto;min-height:110px;max-height:34vh;font-size:14px;line-height:1.4;padding:4px 2px}
 .cl .m{margin:5px 0;word-break:break-word}.cl .m b{color:#ffe08a}.cl .m.me{text-align:right}.cl .m.me b{color:#9ff0b8}
 .cr{display:flex;gap:8px}.cr input{margin:0;text-transform:none;letter-spacing:0;font-size:16px;text-align:left;flex:1}.cr button{padding:10px 16px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 12px}
+.tile{background:#ffffff12;border:1px solid #ffffff1c;border-radius:12px;padding:10px 6px;text-align:center}
+.tile b{display:block;font-size:26px;color:var(--gold);line-height:1.1}.tile span{font-size:12px;color:var(--mut)}
+.gt{margin:12px 0 4px;font-weight:800;color:#ffe08a;font-size:14px}
+.donut{display:flex;align-items:center;gap:14px;font-size:14px;line-height:1.6}
+.strip{line-height:1}.strip span{display:inline-block;width:14px;height:14px;border-radius:3px;margin:1px}.strip .w{background:#3ddc84}.strip .l{background:#e5484d}
+#sb .sub{margin:12px 0 8px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:130;background:#000d;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;box-shadow:0 4px 14px #000a}
 #vc{position:fixed;top:max(8px,env(safe-area-inset-top));left:58px;z-index:99;width:40px;height:40px;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:20px;text-decoration:none;background:#5865f2;box-shadow:inset 0 0 0 2px #fff6,0 3px 8px #0008}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
@@ -134,6 +141,7 @@ button:disabled{opacity:.4}
 <div class="cr"><input id="ci" maxlength="200" placeholder="Type a message…" autocomplete="off"><button id="csnd">Send</button></div>
 </div>
 <a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
+<div id="stats" class="ov" hidden><div class="rc"><button class="x" id="sx" aria-label="Close">✕</button><div id="sb"></div></div></div>
 <div id="toast" style="display:none"></div>
 <div id="app"></div>
 <script>
@@ -181,7 +189,7 @@ const infoBtn=document.getElementById('info'),rulesEl=document.getElementById('r
 infoBtn.onclick=()=>{rulesEl.hidden=false};
 rulesEl.onclick=e=>{if(e.target===rulesEl)rulesEl.hidden=true};
 document.getElementById('rx').onclick=()=>{rulesEl.hidden=true};
-document.addEventListener('keydown',e=>{if(e.key==='Escape')rulesEl.hidden=true});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){rulesEl.hidden=true;statsEl.hidden=true}});
 const cb=document.getElementById('cb'),chatEl=document.getElementById('chat'),cl=document.getElementById('cl'),ci=document.getElementById('ci'),cbd=document.getElementById('cbd');
 function renderChat(){
   if(!cl.appendChild)return;
@@ -195,11 +203,44 @@ document.getElementById('cx2').onclick=()=>{chatEl.hidden=true};
 document.getElementById('csnd').onclick=sendChat;
 ci.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}};
 function typingInApp(){const a=document.activeElement;return !!(a&&a.tagName==='INPUT'&&(!$.contains||$.contains(a)))}
+/* ---- personal statistics (saved on this device) ---- */
+const STATS_KEY='dk_stats',statsEl=document.getElementById('stats');
+function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY));if(s&&typeof s.m==='number')return s}catch(e){}return {m:0,w:0,l:0,h:'',last:''}}
+function saveStats(s){try{localStorage.setItem(STATS_KEY,JSON.stringify(s))}catch(e){}}
+function recordResult(m){   // called with every state; counts each finished game exactly once
+  const ng=m.game;if(!ng||ng.winner<0)return;
+  const gid=ng.gid||(m.room+':'+ng.seq+':'+ng.winner),s=loadStats();if(s.last===gid)return;
+  const win=ng.winner===m.me;s.m++;if(win)s.w++;else s.l++;s.h=((s.h||'')+(win?'1':'0')).slice(-200);s.last=gid;saveStats(s);
+}
+function openStats(){
+  const s=loadStats(),m=s.m,w=s.w,l=s.l,p=m?Math.round(1000*w/m)/10:0,C=2*Math.PI*40,h=s.h||'';
+  let rw=w-[...h].filter(x=>x==='1').length,rm=m-h.length;const pts=[];
+  [...h].forEach(x=>{rm++;if(x==='1')rw++;pts.push(100*rw/rm)});
+  const view=pts.slice(-50),n=view.length,X=i=>n>1?24+i*248/(n-1):148,Y=v=>100-v*0.92;
+  const chart=n?`<svg viewBox="0 0 280 118" width="100%" role="img" aria-label="Win percentage over time">
+    ${[0,50,100].map(v=>`<line x1="24" x2="272" y1="${Y(v)}" y2="${Y(v)}" stroke="#ffffff30" stroke-dasharray="${v===50?'4 3':'0'}"/><text x="2" y="${Y(v)+4}" font-size="10" fill="#9fc2ae">${v}%</text>`).join('')}
+    <polyline fill="none" stroke="#3ddc84" stroke-width="2.5" stroke-linejoin="round" points="${view.map((v,i)=>X(i)+','+Y(v)).join(' ')}"/>
+    <circle cx="${X(n-1)}" cy="${Y(view[n-1])}" r="4" fill="#ffd75e"/></svg>`:'<div class="sub">Play a game to see your graph.</div>';
+  const ring=m?`<circle cx="50" cy="50" r="40" fill="none" stroke="#e5484d" stroke-width="14"/><circle cx="50" cy="50" r="40" fill="none" stroke="#3ddc84" stroke-width="14" stroke-dasharray="${C*w/m} ${C}" transform="rotate(-90 50 50)"/>`:'<circle cx="50" cy="50" r="40" fill="none" stroke="#ffffff30" stroke-width="14"/>';
+  document.getElementById('sb').innerHTML=`<div class="rt"><span>📊</span> My statistics</div>
+    <div class="tiles"><div class="tile"><b>${m}</b><span>Matches played</span></div><div class="tile"><b>${w}</b><span>Wins</span></div><div class="tile"><b>${l}</b><span>Losses</span></div><div class="tile"><b>${p}%</b><span>Win percentage</span></div></div>
+    <div class="gt">Win to loss ratio</div>
+    <div class="donut"><svg viewBox="0 0 100 100" width="120" height="120">${ring}<text x="50" y="56" text-anchor="middle" font-size="18" font-weight="800" fill="#fff">${p}%</text></svg>
+    <div><span style="color:#3ddc84">● Wins</span> ${w}<br><span style="color:#e5484d">● Losses</span> ${l}<br>Win : Loss = <b>${w} : ${l}</b><br>Ratio = <b>${l?(w/l).toFixed(2):(w?'no losses yet':'–')}</b></div></div>
+    <div class="gt">Win % after each of your last ${n} game${n===1?'':'s'}</div>${chart}
+    <div class="gt">Recent results (oldest to newest)</div><div class="strip">${m?[...h.slice(-20)].map(x=>`<span class="${x==='1'?'w':'l'}"></span>`).join(''):'–'}</div>
+    <div class="sub">A win means you finished first. A loss is any game that someone else won. These numbers are saved on this device.</div>
+    <button id="srs" class="sec">Reset statistics</button>`;
+  document.getElementById('srs').onclick=()=>{if(confirm('Reset all your statistics?')){const k=loadStats().last;saveStats({m:0,w:0,l:0,h:'',last:k});openStats()}};
+  statsEl.hidden=false;
+}
+statsEl.onclick=e=>{if(e.target===statsEl)statsEl.hidden=true};
+document.getElementById('sx').onclick=()=>{statsEl.hidden=true};
 function connect(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
   ws.onopen=()=>{if(room&&uname&&S)join();draw()};
   ws.onmessage=e=>{const m=JSON.parse(e.data);
-    if(m.type==='state'){const pg=S&&S.game,ng=m.game;
+    if(m.type==='state'){const pg=S&&S.game,ng=m.game;recordResult(m);
       if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
       else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
       if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const lo=m.players.map((_,i)=>i).sort((a,b)=>ng.counts[b]-ng.counts[a])[0];const sad=m.me===lo&&m.me!==ng.winner;sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
@@ -238,8 +279,9 @@ function render(){
   if(!S){$.innerHTML=`<div class="panel">${HERO}${LOGO}<div class="sub">${invited?'🎉 You are invited to room <b>'+esc(invited)+'</b>. Enter your name and tap Join.':'2–5 player card game (play alone against bots too). Pick a name, then create a room code and share it with friends, or enter the code they gave you.'}</div>
     <input id="nm" maxlength="14" placeholder="Your name" value="${esc(uname)}" style="text-transform:none;letter-spacing:0">
     <input id="rc" maxlength="6" placeholder="ROOM CODE" value="${esc(room)}"><button id="jb">Join / Create room</button>
-    <div style="margin-top:10px"><button id="rnd" class="sec">Make a random code</button></div><div style="margin-top:10px"><button id="inv" class="sec">🔗 Share invite link</button></div><div class="err">${esc(err)}</div></div>`;
+    <div style="margin-top:10px"><button id="rnd" class="sec">Make a random code</button></div><div style="margin-top:10px"><button id="inv" class="sec">🔗 Share invite link</button></div><div style="margin-top:10px"><button id="stb" class="sec">📊 My statistics</button></div><div class="err">${esc(err)}</div></div>`;
     document.getElementById('rnd').onclick=()=>{document.getElementById('rc').value=Math.random().toString(36).slice(2,6).toUpperCase()};
+    document.getElementById('stb').onclick=openStats;
     document.getElementById('inv').onclick=()=>{const rc=document.getElementById('rc');let c=cleanCode(rc.value);if(!c){c=Math.random().toString(36).slice(2,6).toUpperCase();rc.value=c}shareInvite(c)};
     document.getElementById('jb').onclick=()=>{uname=document.getElementById('nm').value.trim();room=document.getElementById('rc').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
       if(!uname||!room){err='Enter your name and a room code.';return draw()}
