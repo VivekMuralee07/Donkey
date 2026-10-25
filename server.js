@@ -63,7 +63,7 @@ function playCore(room, i, c) {
   if (!g.sim && okc.length > 1) record(g, i, c, okc);   // bots learn from every real move
   g.hands[i].splice(g.hands[i].indexOf(c), 1);
   g.seq++;
-  if (!g.trick.length) { g.lead = su(c); g.first = false; }
+  if (!g.trick.length) { g.lead = su(c); g.first = false; g.avoid = null; }
   const off = su(c) !== g.lead;
   g.trick.push({ p: i, c, off });
   if (!off && g.trick.length < n) { g.turn = (i + 1) % n; g.msg = P[i].name + ' played ' + name(c) + '.'; return true; }
@@ -75,6 +75,7 @@ function playCore(room, i, c) {
     const hi = t.filter(x => !x.off).sort((a, b) => rk(b.c) - rk(a.c))[0];
     g.hands[hi.p].push(...t.map(x => x.c));
     g.voids[i][g.lead] = true; g.voids[hi.p] = [];   // bots remember who had no card of a suit
+    g.avoid = { p: hi.p, suit: g.lead };               // the picker should not lead that same suit again straight away
     g.msg = P[i].name + ' had no ' + SYM[g.lead] + '. ' + P[hi.p].name + ' (highest: ' + name(hi.c) + ') picks up ' + t.length + ' cards.';
     next = hi.p;
   } else {
@@ -102,9 +103,14 @@ function legal(hand, trick, lead) {
 }
 // MEDIUM: stay out of trouble. Follow suit with a card lower than the best one on the table when possible
 // (so someone else picks up), dump the highest card when it has no suit, lead with the lowest card.
-function mediumPick(hand, trick, lead, n) {
-  const ok = legal(hand, trick, lead);
-  if (!trick.length) return minBy(ok, c => rk(c) + Math.random() * 0.01);
+function mediumPick(hand, trick, lead, n, voids, me, allowed) {
+  const ok = allowed || legal(hand, trick, lead);
+  if (!trick.length) {
+    // leading: lowest card, but avoid suits where somebody is known to have none (they would cut and the highest card picks everything up)
+    const risk = c => (voids ? voids.reduce((a, v, p) => a + (p !== me && v[su(c)] ? 1 : 0), 0) : 0);
+    const best = Math.min(...ok.map(risk));
+    return minBy(ok.filter(c => risk(c) === best), c => rk(c) + Math.random() * 0.01);
+  }
   if (!hand.some(c => su(c) === lead)) return maxBy(ok, c => rk(c) + Math.random() * 0.01);
   const cur = Math.max(...trick.filter(x => !x.off).map(x => rk(x.c)));
   const lower = ok.filter(c => rk(c) < cur);
@@ -256,9 +262,14 @@ function hardPick(room, i, ok) {
   return maxBy(cand, c => total.get(c) + Math.random() * 1e-6);
 }
 function botPick(room, i, level) {
-  const g = room.game, ok = playable(g, i);
+  const g = room.game;
+  let ok = playable(g, i);
+  if (!g.trick.length && g.avoid && g.avoid.p === i) {   // never lead the same suit again right after picking up the table because of it
+    const alt = ok.filter(c => su(c) !== g.avoid.suit);
+    if (alt.length) ok = alt;
+  }
   if (ok.length <= 1 || !LEVELS.includes(level) || level === 'easy') return ok[Math.floor(Math.random() * ok.length)];
-  if (level === 'medium') return mediumPick(g.hands[i], g.trick, g.lead, room.players.length);
+  if (level === 'medium') return mediumPick(g.hands[i], g.trick, g.lead, room.players.length, g.voids, i, ok);
   return hardPick(room, i, ok);
 }
 
@@ -291,6 +302,7 @@ function toLobby(room) {
 
 // ---------- rooms ----------
 const rooms = new Map(); // code -> { code, players:[{sub,name,ws}], game, touched }
+const chatView = (m, sub) => ({ name: m.name, avatar: m.avatar, text: m.text, t: m.t, mine: m.from === sub });
 function send(ws, o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function push(room) {
   room.touched = Date.now();
@@ -354,10 +366,22 @@ wss.on('connection', ws => {
           const av = AVATARS.includes(m.avatar) && !taken.has(m.avatar) ? m.avatar : AVATARS.find(x => !taken.has(x));
           room.players.push({ sub: ws.user.sub, name: ws.user.name, ws, avatar: av });
         }
-        ws.room = room; return push(room);
+        ws.room = room;
+        send(ws, { type: 'chatlog', msgs: (room.chat || []).map(x => chatView(x, ws.user.sub)) });
+        return push(room);
       }
       const room = ws.room; if (!room) return;
+      if (m.type === 'leave') { leave(ws); return; }   // back to the main screen
       const idx = room.players.findIndex(x => x.ws === ws);
+      if (m.type === 'chat') {
+        const text = String(m.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200), now = Date.now();
+        if (!text || idx < 0 || now - (ws.lastChat || 0) < 400) return;
+        ws.lastChat = now;
+        const pl = room.players[idx], msg = { name: pl.name, avatar: pl.avatar, text, t: now, from: pl.sub };
+        room.chat = room.chat || []; room.chat.push(msg); if (room.chat.length > 40) room.chat.shift();
+        room.players.forEach(q => send(q.ws, { type: 'chat', msg: chatView(msg, q.sub) }));
+        return;
+      }
       if (m.type === 'avatar') {
         if (!room.game && idx >= 0 && AVATARS.includes(m.a) && !room.players.some((q, k) => k !== idx && q.avatar === m.a)) { room.players[idx].avatar = m.a; push(room); }
         return;

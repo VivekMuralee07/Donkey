@@ -84,6 +84,15 @@ button:disabled{opacity:.4}
 .c1 .log,.c2 .log,.c3 .log{display:none}.c1 .center{min-height:92px;margin:4px 0}
 .c2 .opp .av{width:32px;height:32px;font-size:20px}.c2 .fan{display:none}.c2 .center{min-height:70px}.c2 .center .card{width:40px;height:58px;font-size:14px}
 .c3 .table,.table.c3{padding:8px}.c3 .msg{margin:2px 0;min-height:0}.c3 .me .av{width:28px;height:28px;font-size:18px}.c3 .center{min-height:56px;margin:2px 0}.c3 .center .card{width:34px;height:50px;font-size:12px}.c3 .who{display:none}.c3 .opp .cnt{margin-top:0}
+#cb{position:fixed;top:max(8px,env(safe-area-inset-top));right:58px;z-index:99;width:40px;height:40px;padding:0;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:19px;background:#000a;color:#fff;box-shadow:inset 0 0 0 1px #ffffff40,0 3px 8px #0008}
+#cbd{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#e5484d;color:#fff;font-size:11px;line-height:18px;font-weight:800}
+.cs{position:fixed;left:0;right:0;bottom:0;z-index:110;display:flex;flex-direction:column;gap:8px;max-width:560px;margin:0 auto;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-radius:18px 18px 0 0;background:linear-gradient(180deg,#14352336,#081a11);background-color:#0a2016;border-top:2px solid #f5c54255;box-shadow:0 -10px 30px #000b}
+.cs[hidden]{display:none}
+.chd{display:flex;justify-content:space-between;align-items:center;color:var(--gold)}
+.x2{width:32px;height:32px;padding:0;border-radius:50%;font-size:14px;background:#ffffff22;color:#fff;box-shadow:none}
+.cl{overflow:auto;min-height:110px;max-height:34vh;font-size:14px;line-height:1.4;padding:4px 2px}
+.cl .m{margin:5px 0;word-break:break-word}.cl .m b{color:#ffe08a}.cl .m.me{text-align:right}.cl .m.me b{color:#9ff0b8}
+.cr{display:flex;gap:8px}.cr input{margin:0;text-transform:none;letter-spacing:0;font-size:16px;text-align:left;flex:1}.cr button{padding:10px 16px}
 #vc{position:fixed;top:max(8px,env(safe-area-inset-top));left:58px;z-index:99;width:40px;height:40px;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:20px;text-decoration:none;background:#5865f2;box-shadow:inset 0 0 0 2px #fff6,0 3px 8px #0008}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
 .ov{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:16px;background:#000c}.ov[hidden]{display:none}
@@ -114,15 +123,22 @@ button:disabled{opacity:.4}
 <li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. The player left with the most cards is the Donkey 🫏.</li>
 <li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
 <li><b>After the game:</b> everyone returns to the lobby after a few seconds. There you can change avatars, add bots and deal again.</li>
+<li><b>Chat:</b> tap the 💬 button to type messages to the other players in your room.</li>
 <li><b>Voice chat:</b> tap the blue 🎧 button to join your group's Discord voice channel. Paste the invite link on the room screen first.</li>
 </ul></div></div>
+<button id="cb" aria-label="Chat" style="display:none">💬<span id="cbd" hidden></span></button>
+<div id="chat" class="cs" hidden>
+<div class="chd"><b>💬 Chat</b><button id="cx2" class="x2" aria-label="Close chat">✕</button></div>
+<div id="cl" class="cl"></div>
+<div class="cr"><input id="ci" maxlength="200" placeholder="Type a message…" autocomplete="off"><button id="csnd">Send</button></div>
+</div>
 <a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
 <div id="app"></div>
 <script>
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0,pendingDraw=false,botLevel='easy';
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0,pendingDraw=false,botLevel='easy',chatMsgs=[],unread=0;
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 try{botLevel=localStorage.getItem('dk_lvl')||'easy'}catch(e){}
@@ -155,6 +171,19 @@ infoBtn.onclick=()=>{rulesEl.hidden=false};
 rulesEl.onclick=e=>{if(e.target===rulesEl)rulesEl.hidden=true};
 document.getElementById('rx').onclick=()=>{rulesEl.hidden=true};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')rulesEl.hidden=true});
+const cb=document.getElementById('cb'),chatEl=document.getElementById('chat'),cl=document.getElementById('cl'),ci=document.getElementById('ci'),cbd=document.getElementById('cbd');
+function renderChat(){
+  if(!cl.appendChild)return;
+  cl.innerHTML='';
+  chatMsgs.forEach(m=>{const d=document.createElement('div');d.className='m'+(m.mine?' me':'');const b=document.createElement('b');b.textContent=(m.avatar||'')+' '+m.name+': ';d.appendChild(b);d.appendChild(document.createTextNode(m.text));cl.appendChild(d)});
+  cl.scrollTop=cl.scrollHeight;cbd.hidden=!unread;cbd.textContent=unread;
+}
+function sendChat(){const t=ci.value.trim();if(!t)return;send({type:'chat',text:t});ci.value=''}
+cb.onclick=()=>{chatEl.hidden=false;unread=0;renderChat();setTimeout(()=>{try{ci.focus()}catch(e){}},50)};
+document.getElementById('cx2').onclick=()=>{chatEl.hidden=true};
+document.getElementById('csnd').onclick=sendChat;
+ci.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();sendChat()}};
+function typingInApp(){const a=document.activeElement;return !!(a&&a.tagName==='INPUT'&&(!$.contains||$.contains(a)))}
 function connect(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
   ws.onopen=()=>{if(room&&uname&&S)join();draw()};
@@ -164,6 +193,8 @@ function connect(){
       else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
       if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const lo=m.players.map((_,i)=>i).sort((a,b)=>ng.counts[b]-ng.counts[a])[0];const sad=m.me===lo&&m.me!==ng.winner;sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
       voiceUrl=m.voice||'';S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
+    else if(m.type==='chatlog'){chatMsgs=m.msgs||[];unread=0;renderChat()}
+    else if(m.type==='chat'){chatMsgs.push(m.msg);if(chatMsgs.length>60)chatMsgs.shift();if(chatEl.hidden&&!m.msg.mine)unread++;renderChat()}
     else if(m.type==='error'){err=m.text;if(m.left)S=null}
     draw()};
   ws.onclose=()=>setTimeout(connect,1500);
@@ -212,7 +243,8 @@ function render(){
     const hasBot=S.players.some(p=>p.bot);
     h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Easy plays random cards, Medium plays it safe, Hard remembers cards, plans ahead and learns how each player plays.</div><div class="sub" style="margin-top:-6px">🧠 Bots have learned from ${S.learned||0} finished game${S.learned===1?'':'s'}.</div>`;
     h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
-    $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;
+    $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button></div>`;
+    document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;voiceUrl='';err='';sel=null;winAt=0;prevTL=0;draw()};
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
     const vs=document.getElementById('vs');if(vs)vs.onclick=()=>send({type:'voice',url:document.getElementById('vu').value});
     const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot',level:botLevel});
@@ -248,17 +280,17 @@ function fits(){try{return $.getBoundingClientRect().bottom+(window.scrollY||0)+
 /* Draw the table; if it is taller than the screen, shrink cards and spacing step by step until it fits (no scrolling). */
 function draw(){
   /* Never rebuild the screen while someone is typing: it would destroy the input and close the keyboard. */
-  const ae=document.activeElement;
-  if(ae&&ae.tagName==='INPUT'){pendingDraw=true;return}
+  if(typingInApp()){pendingDraw=true;return}
   pendingDraw=false;
   const a=animHand,p=prevTL;lvl=0;
   for(;;){animHand=a;prevTL=p;tableMode=false;render();if(!tableMode||lvl>=6||fits())break;lvl++}
   animHand=false;
   if(infoBtn.style)infoBtn.style.display=tableMode?'none':'flex';
+  if(cb.style){cb.style.display=S?'flex':'none';if(!S){chatEl.hidden=true;chatMsgs=[];unread=0}}
   const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
 setInterval(()=>{const e=document.getElementById('cd');if(e&&winAt)e.textContent=Math.max(0,Math.ceil(10-(Date.now()-winAt)/1000))},300);
-document.addEventListener('focusout',()=>{if(pendingDraw)setTimeout(()=>{const x=document.activeElement;if(!(x&&x.tagName==='INPUT'))draw()},400)});
+document.addEventListener('focusout',()=>{if(pendingDraw)setTimeout(()=>{if(!typingInApp())draw()},400)});
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tableMode)draw()},150)});
 connect();draw();
 </script></body></html>
