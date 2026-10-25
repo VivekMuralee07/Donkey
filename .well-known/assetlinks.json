@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.vivek.donkey_aev6.twa",
+        "sha256_cert_fingerprints": ["0A:62:20:5F:01:D1:71:3B:65:BE:37:94:43:8F:57:5D:6A:28:7F:D5:D8:69:AE:39:C6:87:5E:31:A7:94:D1:CD"]
+      }
+    }]
