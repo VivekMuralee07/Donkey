@@ -66,7 +66,7 @@ button:disabled{opacity:.4}
 .hs{width:26px;height:26px;line-height:26px;border-radius:50%;background:#ffffff1c;text-align:center;font-size:17px;color:#fff;margin-top:8px}.hs.r{color:#ff7b7b}.hs:empty{background:none}
 .hr{position:relative}
 .hr .card{position:absolute;width:var(--cw);height:var(--ch);font-size:var(--fs);padding:3px 3px 2px 5px;transition:top .12s,filter .12s;box-shadow:-3px 0 6px #0008}
-.hr .card .rk{font-size:1.1em}.hr .card .st{font-size:1em}.hr .card .c{font-size:calc(var(--cw)*.62)}
+.hr .card .rk{font-size:1.1em}.hr .card .st{font-size:1em}.hr .card .c{display:none}
 .hr .card.ok{outline:2px solid var(--gold);cursor:pointer}.hr .card.no{filter:brightness(.55)}
 .hr .card.sel{outline:3px solid #fff;box-shadow:0 0 18px var(--gold),0 6px 14px #000a}
 .deal .card{animation:deal .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--n,0)*35ms)}
@@ -131,12 +131,12 @@ const send=o=>ws&&ws.readyState===1&&ws.send(JSON.stringify(o));
 function join(){send({type:'join',code:room,name:uname,pid,avatar})}
 
 function card(c,cls,x){const s=SU[su(c)],r=rl(rk(c));return `<div class="card ${su(c)>1?'r':''} ${rk(c)>=11&&rk(c)<=13?'f':rk(c)===14?'a':''} ${cls||''}" ${x||''}><div class="i"><span class="rk">${r}</span><span class="st">${s}</span></div><div class="c">${s}</div></div>`}
-function plan(n){return n===2?'2 players: 39 cards (3/4 of a deck, picked at random), 19 or 20 each':n===3?'3 players: the full deck of 52, 17 or 18 cards each':n===4?'4 players: the full deck of 52, 13 cards each':n===5?'5 players: the full deck of 52, 10 or 11 cards each':''}
+function plan(n){return n===2?'2 players: 39 cards (3/4 of a deck, picked at random), 19 or 20 each':n===3?'3 players: 39 cards (3/4 of a deck, picked at random), 13 each':n===4?'4 players: the full deck of 52, 13 cards each':n===5?'5 players: the full deck of 52, 10 or 11 cards each':''}
 
 /* Hand: cards grouped in one row per suit, highest rank first. Tap a highlighted card to select it, then press Play. */
 function handHTML(hand,myTurn,ok){
-  const k0=[1,.92,.85,.78,.72,.66,.62][lvl],vw=Math.min(window.innerWidth,760),cw=Math.round((vw>520?66:52)*k0),ch=Math.round(cw*1.45),fs=Math.max(12,Math.round(cw*.43)),pitch=Math.round(ch*.74);
-  const W=Math.max(200,vw-92),minStep=cw*.55,per=Math.max(1,Math.floor((W-cw)/minStep)+1),seen={};let idx=0;
+  const k0=[1,.92,.85,.78,.72,.66,.62][lvl],vw=Math.min(window.innerWidth,760),cw=Math.round((vw>520?66:52)*k0),fs=Math.max(12,Math.round(cw*.43)),pitch=Math.round(fs*2.15+9);
+  const ch=Math.max(Math.round(cw*1.3),pitch+8),W=Math.max(200,vw-92),minStep=cw*.55,per=Math.max(1,Math.floor((W-cw)/minStep)+1),seen={};let idx=0;
   const rows=[];
   for(let s=0;s<4;s++){const cs=hand.filter(c=>su(c)===s).sort((a,b)=>rk(b)-rk(a));for(let i=0;i<cs.length;i+=per)rows.push({s,first:i===0,row:cs.slice(i,i+per)})}
   let h=`<div class="hand ${animHand?'deal':''}" style="--cw:${cw}px;--ch:${ch}px;--fs:${fs}px">`;

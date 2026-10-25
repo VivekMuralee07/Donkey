@@ -26,12 +26,12 @@ const SYM = ['♠', '♣', '♦', '♥'], RL = { 11: 'J', 12: 'Q', 13: 'K', 14: 
 const name = c => (RL[rk(c)] || rk(c)) + SYM[su(c)];
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
-// 2 players: 39 cards (75% of a deck). 3-5 players: the full 52-card deck.
+// 2 and 3 players: 39 cards (75% of a deck, picked at random). 4-5 players: the full 52-card deck.
 // Cards are dealt one by one; when the count does not divide evenly, a random player gets the extra card(s).
 // The Ace of Spades is always among the dealt cards, so someone can start.
 function newGame(room) {
   const n = room.players.length;
-  const total = n === 2 ? 39 : 52;
+  const total = n <= 3 ? 39 : 52;
   let hands;
   do {
     const pool = shuffle([...Array(52).keys()]).slice(0, total);
