@@ -45,7 +45,7 @@ function newGame(room) {
     pool.forEach((c, i) => hands[(start + i) % n].push(c));
   } while (!hands.some(h => h.includes(ACE_SPADES)));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
-  room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [],
+  room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []),
     msg: room.players[first].name + ' holds the Ace of Spades and starts.' };
 }
 function playable(g, i) {
@@ -59,6 +59,7 @@ function playCore(room, i, c) {
   const g = room.game, P = room.players, n = P.length;
   if (!g || g.winner >= 0 || g.turn !== i || !playable(g, i).includes(c)) return false;
   g.hands[i].splice(g.hands[i].indexOf(c), 1);
+  g.seq++;
   if (!g.trick.length) { g.lead = su(c); g.first = false; }
   const off = su(c) !== g.lead;
   g.trick.push({ p: i, c, off });
@@ -70,17 +71,103 @@ function playCore(room, i, c) {
     // Everyone before the cutter followed suit: the highest of those cards picks up the whole table.
     const hi = t.filter(x => !x.off).sort((a, b) => rk(b.c) - rk(a.c))[0];
     g.hands[hi.p].push(...t.map(x => x.c));
+    g.voids[i][g.lead] = true; g.voids[hi.p] = [];   // bots remember who had no card of a suit
     g.msg = P[i].name + ' had no ' + SYM[g.lead] + '. ' + P[hi.p].name + ' (highest: ' + name(hi.c) + ') picks up ' + t.length + ' cards.';
     next = hi.p;
   } else {
     const top = t.slice().sort((a, b) => rk(b.c) - rk(a.c))[0];
     g.msg = 'Round over. ' + name(top.c) + ' by ' + P[top.p].name + ' is highest; cards set aside.';
     next = top.p;
+    g.seen.push(...t.map(x => x.c));              // cards set aside are out of the game
   }
   g.last = t; g.trick = []; g.turn = next; g.lead = -1;
   const fin = t.map(x => x.p).concat([next]).find(k => g.hands[k].length === 0);
   if (fin !== undefined) g.winner = fin;
   return true;
+}
+
+// ---------- bot brains ----------
+const LEVELS = ['easy', 'medium', 'hard'];
+const maxBy = (a, f) => a.reduce((b, x) => (f(x) > f(b) ? x : b));
+const minBy = (a, f) => a.reduce((b, x) => (f(x) < f(b) ? x : b));
+const topOf = list => list.slice().sort((a, b) => rk(b.c) - rk(a.c))[0];   // earliest wins a tie
+function legal(hand, trick, lead) {
+  if (!trick.length) return hand;
+  const f = hand.filter(c => su(c) === lead);
+  return f.length ? f : hand;
+}
+// MEDIUM: stay out of trouble. Follow suit with a card lower than the best one on the table when possible
+// (so someone else picks up), dump the highest card when it has no suit, lead with the lowest card.
+function mediumPick(hand, trick, lead, n) {
+  const ok = legal(hand, trick, lead);
+  if (!trick.length) return minBy(ok, c => rk(c) + Math.random() * 0.01);
+  if (!hand.some(c => su(c) === lead)) return maxBy(ok, c => rk(c) + Math.random() * 0.01);
+  const cur = Math.max(...trick.filter(x => !x.off).map(x => rk(x.c)));
+  const lower = ok.filter(c => rk(c) < cur);
+  if (lower.length) return maxBy(lower, rk);
+  return trick.length === n - 1 ? maxBy(ok, rk) : minBy(ok, rk);   // last to play: round just ends, so dump the high card
+}
+// Play out the rest of ONE round (others use the medium brain). Returns who picks up the table (-1 = cards set aside).
+function simRound(hands, trick, lead, turn, n, first) {
+  trick = trick.map(x => ({ ...x }));
+  let c = first;
+  for (;;) {
+    const h = hands[turn]; h.splice(h.indexOf(c), 1);
+    if (!trick.length) lead = su(c);
+    const off = su(c) !== lead;
+    trick.push({ p: turn, c, off });
+    if (off) { const hi = topOf(trick.filter(x => !x.off)); hands[hi.p].push(...trick.map(x => x.c)); return { picker: hi.p, size: trick.length, next: hi.p }; }
+    if (trick.length >= n) return { picker: -1, size: trick.length, next: topOf(trick).p };
+    turn = (turn + 1) % n;
+    c = mediumPick(hands[turn], trick, lead, n);
+  }
+}
+// Guess the hidden hands of the players still to act, using only what a real player could know
+// (cards set aside, the table, and which players failed to follow a suit earlier).
+function sampleHands(unknown, rest, sizes, voids) {
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const pool = shuffle(unknown.slice()), out = {}; let ok = true;
+    for (const p of rest) {
+      const take = [];
+      for (let k = pool.length - 1; k >= 0 && take.length < sizes[p]; k--) if (!voids[p][su(pool[k])]) { take.push(pool[k]); pool.splice(k, 1); }
+      if (take.length < sizes[p]) { ok = false; break; }
+      out[p] = take;
+    }
+    if (ok) return out;
+  }
+  const pool = shuffle(unknown.slice()), out = {};
+  for (const p of rest) out[p] = pool.splice(0, sizes[p]);
+  return out;
+}
+// HARD: remembers set-aside cards and who is out of a suit, imagines many possible hands for the players still
+// to act, plays out the round for every candidate card and picks the one that leaves it with the fewest cards.
+function hardPick(room, i, ok) {
+  const g = room.game, n = room.players.length, cand = [...new Set(ok)];
+  const known = new Set([...g.hands[i], ...g.trick.map(x => x.c), ...g.seen]), unknown = [];
+  for (let c = 0; c < 52; c++) if (!known.has(c)) unknown.push(c);
+  const acted = new Set(g.trick.map(x => x.p)), rest = [], sizes = g.hands.map(h => h.length);
+  for (let k = 1; k < n; k++) { const p = (i + k) % n; if (acted.has(p)) break; rest.push(p); }
+  const total = new Map(cand.map(c => [c, 0])), SAMPLES = 60;
+  for (let s = 0; s < SAMPLES; s++) {
+    const hs = sampleHands(unknown, rest, sizes, g.voids);
+    for (const c of cand) {
+      const hands = g.hands.map(h => h.slice()); rest.forEach(p => { hands[p] = hs[p].slice(); });
+      const r = simRound(hands, g.trick, g.lead, i, n, c);
+      let sc = r.picker === i ? -(r.size - 1) : 1;
+      if (r.picker !== -1 && r.picker !== i) sc += 0.7 * r.size;     // making someone else pick up is good
+      if (r.picker !== i) sc += 0.03 * rk(c);                         // get rid of high cards when it is safe
+      const mine = hands[i].length, others = hands.filter((h, p) => p !== i && g.hands[p].length > 0).map(h => h.length);
+      if (others.length) sc += 0.5 * (Math.min(...others) - mine);      // stay ahead in the race to finish
+      total.set(c, total.get(c) + sc);
+    }
+  }
+  return maxBy(cand, c => total.get(c) + Math.random() * 0.01);
+}
+function botPick(room, i, level) {
+  const g = room.game, ok = playable(g, i);
+  if (ok.length <= 1 || !LEVELS.includes(level) || level === 'easy') return ok[Math.floor(Math.random() * ok.length)];
+  if (level === 'medium') return mediumPick(g.hands[i], g.trick, g.lead, room.players.length);
+  return hardPick(room, i, ok);
 }
 
 function play(room, i, c) { if (!playCore(room, i, c)) return false; checkEarly(room); return true; }
@@ -120,9 +207,9 @@ function push(room) {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
       voice: room.voice || DEFAULT_VOICE,
-      players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot })),
+      players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
       game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
-        turn: g.turn, lead: g.lead, first: g.first, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
+        turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
   schedBot(room);
 }
@@ -138,8 +225,7 @@ function schedBot(room) {
     if (!g2 || g2.winner >= 0) return;
     const i = g2.turn, b = room.players[i];
     if (!b || !b.bot) return;
-    const ok = playable(g2, i);
-    if (ok.length && play(room, i, ok[Math.floor(Math.random() * ok.length)])) push(room);
+    if (playable(g2, i).length && play(room, i, botPick(room, i, b.level))) push(room);
   }, BOT_MS + Math.random() * BOT_MS * 0.7);
 }
 function leave(ws) {
@@ -191,7 +277,7 @@ wss.on('connection', ws => {
       if (m.type === 'addbot') {
         if (room.game || idx < 0 || room.players.length >= MAX_PLAYERS) return;
         const nb = room.players.filter(q => q.bot).length;
-        room.players.push({ sub: 'bot-' + Date.now() + '-' + nb, name: 'Bot ' + BOT_NAMES[nb % BOT_NAMES.length], ws: null, bot: true, avatar: BOT_AVATARS[nb % BOT_AVATARS.length] });
+        room.players.push({ sub: 'bot-' + Date.now() + '-' + nb, name: 'Bot ' + BOT_NAMES[nb % BOT_NAMES.length], ws: null, bot: true, level: LEVELS.includes(m.level) ? m.level : 'easy', avatar: BOT_AVATARS[nb % BOT_AVATARS.length] });
         return push(room);
       }
       if (m.type === 'rmbot') {

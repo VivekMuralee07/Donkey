@@ -92,6 +92,9 @@ button:disabled{opacity:.4}
 .ic{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--gold);font-family:Georgia,serif;font-style:italic;font-size:18px}
 .rc ul{margin:0;padding-left:20px;font-size:14px;line-height:1.5}.rc li{margin-bottom:8px}.rc b{color:#ffe08a}
 .rc .x{position:absolute;top:10px;right:10px;width:34px;height:34px;padding:0;border-radius:50%;font-size:15px;background:#ffffff22;color:#fff;box-shadow:none}
+.seg{display:inline-flex;border-radius:12px;overflow:hidden;box-shadow:inset 0 0 0 1px #ffffff30}
+.seg button{border-radius:0;box-shadow:none;background:#ffffff14;color:#fff;padding:9px 16px;font-size:14px}.seg button:active{transform:none}
+.seg button.on{background:linear-gradient(180deg,#ffd75e,#e8a91c);color:#3a2600}
 @media(min-width:520px){.card{width:60px;height:88px;font-size:22px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important}}
 </style></head><body>
@@ -101,7 +104,7 @@ button:disabled{opacity:.4}
 <button class="x" id="rx" aria-label="Close">✕</button>
 <div class="rt"><span class="ic">i</span> Donkey rules</div>
 <ul>
-<li><b>Players:</b> 2 to 5. Bots can fill empty seats and play random legal cards.</li>
+<li><b>Players:</b> 2 to 5. Bots can fill empty seats. Choose Easy (random cards), Medium (plays it safe) or Hard (remembers cards and plans ahead).</li>
 <li><b>Dealing:</b> 2 players get 39 random cards (20 and 19). 3 players get 39 random cards (13 each). 4 players get the full deck (13 each). 5 players get the full deck (10 or 11 each). The Ace of Spades is always dealt.</li>
 <li><b>Start:</b> whoever holds the Ace of Spades plays it first. Play then goes clockwise.</li>
 <li><b>Card order:</b> Ace is highest, then K, Q, J, 10 down to 2.</li>
@@ -119,9 +122,10 @@ button:disabled{opacity:.4}
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0,pendingDraw=false;
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0,pendingDraw=false,botLevel='easy';
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
+try{botLevel=localStorage.getItem('dk_lvl')||'easy'}catch(e){}
 /* ---- sounds: all tones are generated in the browser (no audio files, no copyright) ---- */
 let AC=null,mute=false;try{mute=localStorage.getItem('dk_mute')==='1'}catch(e){}
 function unlock(){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}}
@@ -132,6 +136,11 @@ function seq(notes,step,type,vol){let t=0;notes.forEach(n=>{tone(n[0],t,n[1]*ste
 function sfx(kind){if(mute||!AC)return;try{
   if(kind==='start'){seq([[523.25,1],[659.25,1],[783.99,1],[659.25,1],[783.99,1],[1046.5,2],[783.99,1],[1046.5,1],[1318.5,3]],.13,'triangle',.2)}
   else if(kind==='win'){const e=seq([[392,1],[523.25,1],[659.25,1],[783.99,2],[659.25,1],[783.99,1],[1046.5,3]],.16,'square',.1);[523.25,659.25,783.99,1046.5].forEach(f=>tone(f,e,1.1,'triangle',.12))}
+  else if(kind==='card'){const t=AC.currentTime;
+    const o=AC.createOscillator(),g=AC.createGain();o.type='sine';o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(48,t+.16);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.7,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+.24);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+.26);
+    const len=Math.floor(AC.sampleRate*.035),buf=AC.createBuffer(1,len,AC.sampleRate),d=buf.getChannelData(0);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3);
+    const src=AC.createBufferSource();src.buffer=buf;const f=AC.createBiquadFilter();f.type='highpass';f.frequency.value=1800;const g2=AC.createGain();g2.gain.value=.55;src.connect(f);f.connect(g2);g2.connect(AC.destination);src.start(t)}
   else if(kind==='sad'){seq([[329.63,2],[311.13,2],[293.66,2],[261.63,5]],.22,'sawtooth',.08)}
 }catch(e){}}
 const sb=document.getElementById('snd');sb.textContent=mute?'🔇':'🔊';
@@ -152,6 +161,7 @@ function connect(){
   ws.onmessage=e=>{const m=JSON.parse(e.data);
     if(m.type==='state'){const pg=S&&S.game,ng=m.game;
       if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
+      else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
       if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const lo=m.players.map((_,i)=>i).sort((a,b)=>ng.counts[b]-ng.counts[a])[0];const sad=m.me===lo&&m.me!==ng.winner;sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
       voiceUrl=m.voice||'';S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='error'){err=m.text;if(m.left)S=null}
@@ -194,18 +204,19 @@ function render(){
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
   if(!S.game){winAt=0;prevTL=0;const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
     let h=`<div class="panel"><div class="logo sm">DONKEY</div><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div class="sub">${n}/5 players seated</div>`;
-    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.bot?' (bot)':''}${p.online?'':' (offline)'}</span></div>`);
+    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.bot?' (bot · '+(p.level||'easy')+')':''}${p.online?'':' (offline)'}</span></div>`);
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
     h+='</div>';
     h+=`<div class="sub" style="margin-top:6px">🎧 Voice chat (Discord)</div><div class="sub" style="margin:-6px 0 6px">${S.voice?'Voice link is set. Tap the blue 🎧 button (top-left) to join.':'In Discord: open your voice channel, tap Invite, copy the link and paste it here.'}</div><input id="vu" placeholder="https://discord.gg/yourinvite" value="${esc(S.voice||'')}" style="text-transform:none;letter-spacing:0;font-size:14px"><button id="vs" class="sec">Save voice link</button>`;
     const hasBot=S.players.some(p=>p.bot);
-    h+=`<div style="margin:4px 0">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Bots are easy level and play random legal cards.</div>`;
+    h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div><div class="sub">Playing alone? Add a bot. Easy plays random cards, Medium plays it safe, Hard remembers cards and plans ahead.</div>`;
     h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<p class="sub">${plan(n)}${n<5?'<br>More friends can still join before you deal.':''}</p><button id="st">Deal the cards (${n} players)</button>`;
     $.innerHTML=h+`<div class="err">${esc(err)}</div></div>`;
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
     const vs=document.getElementById('vs');if(vs)vs.onclick=()=>send({type:'voice',url:document.getElementById('vu').value});
-    const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot'});
+    const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot',level:botLevel});
+    $.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{botLevel=b.dataset.l;try{localStorage.setItem('dk_lvl',botLevel)}catch(e){}draw()});
     const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
     const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
   const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
