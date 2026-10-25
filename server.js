@@ -12,6 +12,9 @@ const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['ð
 // Optional Discord voice-chat invite. Set DISCORD_INVITE on Render to give every room a default link; players can also paste one per room.
 const VOICE_RE = /^https:\/\/(discord\.gg|(www\.)?discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,40}$/;
 const DEFAULT_VOICE = VOICE_RE.test(process.env.DISCORD_INVITE || '') ? process.env.DISCORD_INVITE : '';
+// WebRTC voice chat: the server only relays the connection setup messages; the audio goes straight between the players' phones.
+// Set ICE_SERVERS on Render (JSON list, e.g. a TURN server) if some players cannot hear each other.
+const ICE = (() => { try { const j = JSON.parse(process.env.ICE_SERVERS || ''); if (Array.isArray(j) && j.length) return j; } catch (e) { /* use the default */ } return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]; })();
 const BOT_MS = Number(process.env.BOT_MS) || 1000;
 
 const server = http.createServer((req, res) => {
@@ -308,7 +311,7 @@ function push(room) {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
       voice: room.voice || DEFAULT_VOICE, learned: learn.games,
-      players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
+      players: room.players.map(q => ({ vid: q.vid, voice: !!q.voice, name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
       game: g && { gid: g.id, counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
@@ -332,7 +335,7 @@ function schedBot(room) {
 function leave(ws) {
   const room = ws.room; if (!room) return;
   const p = room.players.find(x => x.ws === ws);
-  if (p) p.ws = null;
+  if (p) { p.ws = null; p.voice = false; }
   if (!room.game) room.players = room.players.filter(x => x.ws || x.bot); // free the seat if no game started
   ws.room = null;
   if (!room.players.some(p => !p.bot)) { clearTimeout(room.botTimer); rooms.delete(room.code); } else push(room);
@@ -360,15 +363,28 @@ wss.on('connection', ws => {
         else {
           const taken = new Set(room.players.map(q => q.avatar));
           const av = AVATARS.includes(m.avatar) && !taken.has(m.avatar) ? m.avatar : AVATARS.find(x => !taken.has(x));
-          room.players.push({ sub: ws.user.sub, name: ws.user.name, ws, avatar: av });
+          room.players.push({ sub: ws.user.sub, name: ws.user.name, ws, avatar: av, vid: Math.random().toString(36).slice(2, 8) });
         }
         ws.room = room;
+        send(ws, { type: 'ice', servers: ICE });
         send(ws, { type: 'chatlog', msgs: (room.chat || []).map(x => chatView(x, ws.user.sub)) });
         return push(room);
       }
       const room = ws.room; if (!room) return;
       if (m.type === 'leave') { leave(ws); return; }   // back to the main screen
       const idx = room.players.findIndex(x => x.ws === ws);
+      if (m.type === 'vjoin') {
+        if (idx < 0 || room.players[idx].bot) return;
+        room.players[idx].voice = true;
+        send(ws, { type: 'vlist', peers: room.players.filter((q, k) => k !== idx && q.voice && q.ws).map(q => q.vid) });
+        return push(room);
+      }
+      if (m.type === 'vleave') { if (idx >= 0) { room.players[idx].voice = false; push(room); } return; }
+      if (m.type === 'vsig') {
+        const target = room.players.find(q => q.vid === m.to && q.ws && q.voice);
+        if (idx >= 0 && target && JSON.stringify(m.data || {}).length < 12000) send(target.ws, { type: 'vsig', from: room.players[idx].vid, data: m.data });
+        return;
+      }
       if (m.type === 'chat') {
         const text = String(m.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200), now = Date.now();
         if (!text || idx < 0 || now - (ws.lastChat || 0) < 400) return;

@@ -101,6 +101,10 @@ button:disabled{opacity:.4}
 .strip{line-height:1}.strip span{display:inline-block;width:14px;height:14px;border-radius:3px;margin:1px}.strip .w{background:#3ddc84}.strip .l{background:#e5484d}
 #sb .sub{margin:12px 0 8px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:130;background:#000d;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;box-shadow:0 4px 14px #000a}
+#vj,#mic,#vx{position:fixed;top:max(8px,env(safe-area-inset-top));z-index:99;width:40px;height:40px;padding:0;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:19px;background:#000a;color:#fff;box-shadow:inset 0 0 0 1px #ffffff40,0 3px 8px #0008}
+#vj{right:106px;box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}#mic{right:106px}#vx{right:154px}
+#mic.on{background:#1f7a46;box-shadow:inset 0 0 0 2px #3ddc84,0 3px 8px #0008}#mic.off{background:#7a1f24;box-shadow:inset 0 0 0 2px #e5484d,0 3px 8px #0008}
+body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 #vc{position:fixed;top:max(8px,env(safe-area-inset-top));left:58px;z-index:99;width:40px;height:40px;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:20px;text-decoration:none;background:#5865f2;box-shadow:inset 0 0 0 2px #fff6,0 3px 8px #0008}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
 .ov{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:16px;background:#000c}.ov[hidden]{display:none}
@@ -131,6 +135,7 @@ button:disabled{opacity:.4}
 <li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. The player left with the most cards is the Donkey 🫏.</li>
 <li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
 <li><b>After the game:</b> tap Back to lobby when you are ready. There you can change avatars, add bots and deal again.</li>
+<li><b>Voice talk:</b> when two or more real players are in the room, tap 🎙 to join voice. Tap the green 🎤 to mute or unmute your microphone, and 📴 to leave voice. Bots are not part of voice.</li>
 <li><b>Chat:</b> tap the 💬 button to type messages to the other players in your room.</li>
 <li><b>Voice chat:</b> tap the blue 🎧 button to join your group's Discord voice channel. Paste the invite link on the room screen first.</li>
 </ul></div></div>
@@ -140,6 +145,9 @@ button:disabled{opacity:.4}
 <div id="cl" class="cl"></div>
 <div class="cr"><input id="ci" maxlength="200" placeholder="Type a message…" autocomplete="off"><button id="csnd">Send</button></div>
 </div>
+<button id="vj" aria-label="Join voice chat">🎙</button>
+<button id="mic" aria-label="Microphone on or off">🎤</button>
+<button id="vx" aria-label="Leave voice chat">📴</button>
 <a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
 <div id="stats" class="ov" hidden><div class="rc"><button class="x" id="sx" aria-label="Close">✕</button><div id="sb"></div></div></div>
 <div id="toast" style="display:none"></div>
@@ -236,6 +244,60 @@ function openStats(){
 }
 statsEl.onclick=e=>{if(e.target===statsEl)statsEl.hidden=true};
 document.getElementById('sx').onclick=()=>{statsEl.hidden=true};
+/* ---- voice chat (WebRTC): the audio goes directly between the players' phones, the server only relays the set-up messages ---- */
+let inVoice=false,micOn=false,localStream=null,iceServers=[{urls:'stun:stun.l.google.com:19302'}],peers={},pendC={},lastVjoin=0;
+const vjBtn=document.getElementById('vj'),micBtn=document.getElementById('mic'),vxBtn=document.getElementById('vx');
+function closePeer(v){const p=peers[v];if(!p)return;try{p.pc.close()}catch(e){}if(p.el){try{p.el.srcObject=null;p.el.remove()}catch(e){}}delete peers[v]}
+function makePeer(v,initiator){
+  closePeer(v);
+  const pc=new RTCPeerConnection({iceServers}),p={pc,el:null};peers[v]=p;
+  pc.onicecandidate=e=>{if(e.candidate)send({type:'vsig',to:v,data:{c:e.candidate}})};
+  pc.ontrack=e=>{if(!p.el){p.el=document.createElement('audio');p.el.autoplay=true;p.el.setAttribute('playsinline','');document.body.appendChild(p.el)}
+    p.el.srcObject=(e.streams&&e.streams[0])||new MediaStream([e.track]);const pr=p.el.play&&p.el.play();if(pr&&pr.catch)pr.catch(()=>{})};
+  pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')toast('A voice link failed (that network blocks direct audio)')};
+  if(initiator){
+    if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));else pc.addTransceiver('audio',{direction:'recvonly'});
+    pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>send({type:'vsig',to:v,data:{d:pc.localDescription}})).catch(()=>{});
+  }
+  return p;
+}
+async function flushC(v){const p=peers[v];if(!p||!p.pc.remoteDescription)return;const q=pendC[v]||[];delete pendC[v];for(const c of q){try{await p.pc.addIceCandidate(c)}catch(e){}}}
+async function onVsig(from,data){
+  try{
+    if(data.d&&data.d.type==='offer'){
+      const p=makePeer(from,false);
+      await p.pc.setRemoteDescription(data.d);
+      if(localStream)localStream.getTracks().forEach(t=>p.pc.addTrack(t,localStream));
+      await p.pc.setLocalDescription(await p.pc.createAnswer());
+      send({type:'vsig',to:from,data:{d:p.pc.localDescription}});flushC(from);
+    }else if(data.d){const p=peers[from];if(p){await p.pc.setRemoteDescription(data.d);flushC(from)}}
+    else if(data.c){const p=peers[from];if(p&&p.pc.remoteDescription){try{await p.pc.addIceCandidate(data.c)}catch(e){}}else(pendC[from]=pendC[from]||[]).push(data.c)}
+  }catch(e){}
+}
+async function joinVoice(){
+  if(inVoice)return;
+  if(!window.RTCPeerConnection){toast('Voice chat is not supported in this browser');return}
+  try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});micOn=true}
+  catch(e){localStream=null;micOn=false;toast('Microphone not allowed. You can listen only.')}
+  inVoice=true;lastVjoin=Date.now();send({type:'vjoin'});draw();
+}
+function leaveVoice(){
+  if(!inVoice)return;inVoice=false;
+  Object.keys(peers).forEach(closePeer);pendC={};
+  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
+  micOn=false;send({type:'vleave'});draw();
+}
+function toggleMic(){
+  if(!localStream){toast('No microphone access. Allow it in your browser settings, then leave and join voice again.');return}
+  micOn=!micOn;localStream.getAudioTracks().forEach(t=>{t.enabled=micOn});draw();
+}
+function syncVoice(){   // runs with every state update: drop links to players who left voice, rejoin voice after a reconnect
+  if(!S)return;
+  const me=S.players[S.me],others=new Set(S.players.filter((p,i)=>i!==S.me&&p.voice).map(p=>p.vid));
+  Object.keys(peers).forEach(v=>{if(!others.has(v))closePeer(v)});
+  if(inVoice&&me&&!me.voice&&Date.now()-lastVjoin>2500){Object.keys(peers).forEach(closePeer);lastVjoin=Date.now();send({type:'vjoin'})}
+}
+vjBtn.onclick=joinVoice;micBtn.onclick=toggleMic;vxBtn.onclick=leaveVoice;
 function connect(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
   ws.onopen=()=>{if(room&&uname&&S)join();draw()};
@@ -247,7 +309,11 @@ function connect(){
       voiceUrl=m.voice||'';S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='chatlog'){chatMsgs=m.msgs||[];unread=0;renderChat()}
     else if(m.type==='chat'){chatMsgs.push(m.msg);if(chatMsgs.length>60)chatMsgs.shift();if(chatEl.hidden&&!m.msg.mine)unread++;renderChat()}
+    else if(m.type==='ice'){if(Array.isArray(m.servers)&&m.servers.length)iceServers=m.servers}
+    else if(m.type==='vlist'){(m.peers||[]).forEach(v=>makePeer(v,true))}
+    else if(m.type==='vsig'){onVsig(m.from,m.data||{})}
     else if(m.type==='error'){err=m.text;if(m.left)S=null}
+    if(m.type==='state')syncVoice();
     draw()};
   ws.onclose=()=>setTimeout(connect,1500);
 }
@@ -288,7 +354,7 @@ function render(){
       try{localStorage.setItem('dk_room',room);localStorage.setItem('dk_name',uname)}catch(e){}join()};return}
   if(!S.game){winAt=0;prevTL=0;const n=S.players.length,mine=S.players[S.me]?S.players[S.me].avatar:'';
     let h=`<div class="panel"><div class="logo sm">DONKEY</div><div class="sub">Room code (share it with friends)</div><div class="code">${esc(S.room)}</div><div style="margin:8px 0"><button id="inv2" class="sec">🔗 Invite friends</button></div><div class="sub">${n}/5 players seated</div>`;
-    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${i===S.me?' (you)':''}${p.bot?' (bot · '+(p.level||'easy')+')':''}${p.online?'':' (offline)'}</span></div>`);
+    S.players.forEach((p,i)=>h+=`<div class="seat"><span class="big">${p.avatar||'🙂'}</span><span>${esc(p.name)}${p.voice?' 🎙':''}${i===S.me?' (you)':''}${p.bot?' (bot · '+(p.level||'easy')+')':''}${p.online?'':' (offline)'}</span></div>`);
     h+='<div class="sub" style="margin-top:12px">Choose your avatar (you can change it until the game starts)</div><div class="avs">';
     AV.forEach(a=>{const taken=S.players.some((p,i)=>i!==S.me&&p.avatar===a);h+=`<button data-a="${a}" class="${a===mine?'mine':''} ${taken?'taken':''}" ${taken?'disabled':''}>${a}</button>`});
     h+='</div>';
@@ -307,8 +373,8 @@ function render(){
   const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
   const ok=new Set(g.ok);tableMode=true;winAt=g.winner>=0?(winAt||Date.now()):0;
   if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
-  const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
-  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}" style="min-height:${Math.max(300,(window.innerHeight||800)-64)}px"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
+  const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].voice?' 🎙':''}${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
+  let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}" style="min-height:${Math.max(300,(window.innerHeight||800)-112)}px"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
   if(g.trick.length)g.trick.forEach((t,ti)=>h+=`<div>${card(t.c,ti>=prevTL?'pl':'')}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   prevTL=g.trick.length;
@@ -339,6 +405,11 @@ function draw(){
   for(;;){animHand=a;prevTL=p;tableMode=false;render();if(!tableMode||lvl>=6||fits())break;lvl++}
   animHand=false;
   if(infoBtn.style)infoBtn.style.display=tableMode?'none':'flex';
+  if(!S&&inVoice)leaveVoice();
+  if(document.body&&document.body.classList)document.body.classList.toggle('tb',!!tableMode);
+  if(vjBtn.style){const humans=S?S.players.filter(p=>!p.bot).length:0;
+    vjBtn.style.display=(S&&humans>=2&&!inVoice)?'flex':'none';micBtn.style.display=vxBtn.style.display=inVoice?'flex':'none';
+    micBtn.className=micOn?'on':'off';micBtn.textContent=micOn?'🎤':'🔇'}
   if(cb.style){cb.style.display=S?'flex':'none';if(!S){chatEl.hidden=true;chatMsgs=[];unread=0}}
   const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
