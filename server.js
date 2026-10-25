@@ -1,5 +1,5 @@
 // Donkey – authoritative game server. Run: node server.js
-const http = require('http'), fs = require('fs'), path = require('path');
+const http = require('http'), fs = require('fs'), path = require('path'), os = require('os');
 const { WebSocketServer } = require('ws');
 
 const PORT = process.env.PORT || 3000;
@@ -45,7 +45,7 @@ function newGame(room) {
     pool.forEach((c, i) => hands[(start + i) % n].push(c));
   } while (!hands.some(h => h.includes(ACE_SPADES)));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
-  room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []),
+  room.game = { hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []), obs: Array.from({ length: n }, () => newStats()),
     msg: room.players[first].name + ' holds the Ace of Spades and starts.' };
 }
 function playable(g, i) {
@@ -57,7 +57,10 @@ function playable(g, i) {
 }
 function playCore(room, i, c) {
   const g = room.game, P = room.players, n = P.length;
-  if (!g || g.winner >= 0 || g.turn !== i || !playable(g, i).includes(c)) return false;
+  if (!g || g.winner >= 0 || g.turn !== i) return false;
+  const okc = playable(g, i);
+  if (!okc.includes(c)) return false;
+  if (!g.sim && okc.length > 1) record(g, i, c, okc);   // bots learn from every real move
   g.hands[i].splice(g.hands[i].indexOf(c), 1);
   g.seq++;
   if (!g.trick.length) { g.lead = su(c); g.first = false; }
@@ -88,6 +91,7 @@ function playCore(room, i, c) {
 
 // ---------- bot brains ----------
 const LEVELS = ['easy', 'medium', 'hard'];
+const HARD_MS = Number(process.env.HARD_MS) || 120;   // thinking-time budget of a hard bot per move
 const maxBy = (a, f) => a.reduce((b, x) => (f(x) > f(b) ? x : b));
 const minBy = (a, f) => a.reduce((b, x) => (f(x) < f(b) ? x : b));
 const topOf = list => list.slice().sort((a, b) => rk(b.c) - rk(a.c))[0];   // earliest wins a tie
@@ -107,23 +111,70 @@ function mediumPick(hand, trick, lead, n) {
   if (lower.length) return maxBy(lower, rk);
   return trick.length === n - 1 ? maxBy(ok, rk) : minBy(ok, rk);   // last to play: round just ends, so dump the high card
 }
-// Play out the rest of ONE round (others use the medium brain). Returns who picks up the table (-1 = cards set aside).
-function simRound(hands, trick, lead, turn, n, first) {
-  trick = trick.map(x => ({ ...x }));
-  let c = first;
-  for (;;) {
-    const h = hands[turn]; h.splice(h.indexOf(c), 1);
-    if (!trick.length) lead = su(c);
-    const off = su(c) !== lead;
-    trick.push({ p: turn, c, off });
-    if (off) { const hi = topOf(trick.filter(x => !x.off)); hands[hi.p].push(...trick.map(x => x.c)); return { picker: hi.p, size: trick.length, next: hi.p }; }
-    if (trick.length >= n) return { picker: -1, size: trick.length, next: topOf(trick).p };
-    turn = (turn + 1) % n;
-    c = mediumPick(hands[turn], trick, lead, n);
+
+// ----- LEARNING: how does each player choose among their legal cards? -----
+// For every real move we note the "position" of the chosen card among the legal ones (0 = lowest rank, 1 = highest)
+// in 4 situations: 0 leading, 1 following with a safe (lower) card available, 2 following but forced to beat the table,
+// 3 no card of the suit. Statistics are kept per game, per player (by id) across games, and for all players together.
+const newStats = () => [0, 1, 2, 3].map(() => ({ n: 0, sum: 0, sq: 0 }));
+const DEF_MEAN = [0.15, 0.7, 0.2, 0.9];   // starting guess before anything has been learned
+let learn = { games: 0, pop: newStats(), prof: {} };
+const LEARN_FILE = process.env.LEARN_FILE || path.join(os.tmpdir(), 'donkey-learn.json');
+try { const d = JSON.parse(fs.readFileSync(LEARN_FILE, 'utf8')); if (d && d.pop && d.prof) learn = d; } catch (e) { /* nothing saved yet */ }
+let saveTimer = null;
+function saveLearn() { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; fs.writeFile(LEARN_FILE, JSON.stringify(learn), () => {}); }, 5000); }
+function ctxOf(hand, trick, lead, ok) {
+  if (!trick.length) return 0;
+  if (!hand.some(c => su(c) === lead)) return 3;
+  const cur = Math.max(...trick.filter(x => !x.off).map(x => rk(x.c)));
+  return ok.some(c => rk(c) < cur) ? 1 : 2;
+}
+function record(g, i, c, ok) {
+  const s = ok.slice().sort((a, b) => rk(a) - rk(b) || a - b), u = s.indexOf(c) / (s.length - 1);
+  const st = g.obs[i][ctxOf(g.hands[i], g.trick, g.lead, ok)];
+  st.n++; st.sum += u; st.sq += u * u;
+}
+function addStats(a, b, cap) {
+  for (let k = 0; k < 4; k++) {
+    a[k].n += b[k].n; a[k].sum += b[k].sum; a[k].sq += b[k].sq;
+    if (a[k].n > cap) { const f = cap / a[k].n; a[k].n *= f; a[k].sum *= f; a[k].sq *= f; }
   }
 }
-// Guess the hidden hands of the players still to act, using only what a real player could know
-// (cards set aside, the table, and which players failed to follow a suit earlier).
+function learnFrom(room) {   // called once when a game ends: keep what the human players showed us
+  const g = room.game;
+  if (!g || g.learned || !g.obs) return;
+  g.learned = true;
+  room.players.forEach((p, k) => {
+    if (p.bot) return;
+    const pr = learn.prof[p.sub] = learn.prof[p.sub] || { t: 0, st: newStats() };
+    pr.t = Date.now(); addStats(pr.st, g.obs[k], 600); addStats(learn.pop, g.obs[k], 20000);
+  });
+  learn.games++;
+  const keys = Object.keys(learn.prof);
+  if (keys.length > 300) keys.sort((a, b) => learn.prof[a].t - learn.prof[b].t).slice(0, keys.length - 300).forEach(k => delete learn.prof[k]);
+  saveLearn();
+}
+// A bot's picture of a human opponent = what we learned about them in earlier games + what they did in this game,
+// blended with what all players do on average (used as the starting point).
+function buildModel(room, g, k) {
+  const pr = learn.prof[room.players[k].sub], gs = g.obs[k], out = [];
+  for (let c = 0; c < 4; c++) {
+    const n = (pr ? pr.st[c].n : 0) + gs[c].n, sum = (pr ? pr.st[c].sum : 0) + gs[c].sum, sq = (pr ? pr.st[c].sq : 0) + gs[c].sq;
+    const pm = learn.pop[c].n >= 30 ? learn.pop[c].sum / learn.pop[c].n : DEF_MEAN[c], K = 4;
+    const v = n >= 4 ? Math.max(0, sq / n - (sum / n) ** 2) : 0.09;
+    out.push({ mean: (sum + K * pm) / (n + K), sd: Math.max(0.12, Math.sqrt(v)) });
+  }
+  return out;
+}
+const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 1.6;
+function modelPick(ok, ctx, m) {
+  const s = ok.slice().sort((a, b) => rk(a) - rk(b) || a - b);
+  if (s.length === 1) return s[0];
+  const u = Math.min(1, Math.max(0, m[ctx].mean + m[ctx].sd * gauss()));
+  return s[Math.round(u * (s.length - 1))];
+}
+
+// ----- HARD: imagine possible hidden hands, play whole games out in its head, pick the card that wins most often -----
 function sampleHands(unknown, rest, sizes, voids) {
   for (let attempt = 0; attempt < 25; attempt++) {
     const pool = shuffle(unknown.slice()), out = {}; let ok = true;
@@ -139,29 +190,70 @@ function sampleHands(unknown, rest, sizes, voids) {
   for (const p of rest) out[p] = pool.splice(0, sizes[p]);
   return out;
 }
-// HARD: remembers set-aside cards and who is out of a suit, imagines many possible hands for the players still
-// to act, plays out the round for every candidate card and picks the one that leaves it with the fewest cards.
+// Play out the rest of ONE round. Opponents choose with their own style: a learned model for humans, the real
+// brain for bots (easy = random, otherwise medium). Returns who picks up the table (-1 = cards set aside).
+function simRound(hands, trick, lead, turn, n, first, pol) {
+  trick = trick.map(x => ({ ...x }));
+  let c = first;
+  for (;;) {
+    const h = hands[turn]; h.splice(h.indexOf(c), 1);
+    if (!trick.length) lead = su(c);
+    const off = su(c) !== lead;
+    trick.push({ p: turn, c, off });
+    if (off) { const hi = topOf(trick.filter(x => !x.off)); hands[hi.p].push(...trick.map(x => x.c)); return { picker: hi.p, size: trick.length }; }
+    if (trick.length >= n) return { picker: -1, size: trick.length };
+    turn = (turn + 1) % n;
+    c = pol(turn, hands, trick, lead);
+  }
+}
+// Cards of one suit that sit next to each other in value (nothing unknown or on the table between them) behave the same: try only one.
+function prune(ok, sep) {
+  const bySuit = [[], [], [], []];
+  [...new Set(ok)].forEach(c => bySuit[su(c)].push(c));
+  const keep = [];
+  for (let s = 0; s < 4; s++) {
+    let prev = null;
+    for (const c of bySuit[s].sort((a, b) => rk(a) - rk(b))) {
+      let split = prev === null;
+      for (let r = prev === null ? 0 : rk(prev) + 1; !split && r < rk(c); r++) if (sep.has(s * 13 + r - 2)) split = true;
+      if (split) keep.push(c); else keep[keep.length - 1] = c;   // same behaviour: keep the highest of the group (dumping high cards is better)
+      prev = c;
+    }
+  }
+  return keep;
+}
 function hardPick(room, i, ok) {
-  const g = room.game, n = room.players.length, cand = [...new Set(ok)];
+  const g = room.game, n = room.players.length, t0 = Date.now();
   const known = new Set([...g.hands[i], ...g.trick.map(x => x.c), ...g.seen]), unknown = [];
   for (let c = 0; c < 52; c++) if (!known.has(c)) unknown.push(c);
+  const cand = prune(ok, new Set([...unknown, ...g.trick.map(x => x.c)]));
+  if (cand.length === 1) return cand[0];
   const acted = new Set(g.trick.map(x => x.p)), rest = [], sizes = g.hands.map(h => h.length);
-  for (let k = 1; k < n; k++) { const p = (i + k) % n; if (acted.has(p)) break; rest.push(p); }
-  const total = new Map(cand.map(c => [c, 0])), SAMPLES = 60;
-  for (let s = 0; s < SAMPLES; s++) {
+  for (let k = 1; k < n; k++) { const p = (i + k) % n; if (acted.has(p)) break; rest.push(p); }   // players still to act this round
+  const models = room.players.map((p, k) => (p.bot || k === i ? null : buildModel(room, g, k)));
+  const pol = (q, hands, trick, lead) => {
+    const hand = hands[q], legalNow = legal(hand, trick, lead), pl = room.players[q];
+    if (legalNow.length === 1) return legalNow[0];
+    if (pl.bot && pl.level === 'easy') return legalNow[Math.floor(Math.random() * legalNow.length)];
+    if (!pl.bot && models[q]) return modelPick(legalNow, ctxOf(hand, trick, lead, legalNow), models[q]);
+    return mediumPick(hand, trick, lead, n);
+  };
+  const total = new Map(cand.map(c => [c, 0]));
+  for (let s = 0; s < 300; s++) {
+    if (s >= 8 && Date.now() - t0 > HARD_MS) break;
     const hs = sampleHands(unknown, rest, sizes, g.voids);
     for (const c of cand) {
       const hands = g.hands.map(h => h.slice()); rest.forEach(p => { hands[p] = hs[p].slice(); });
-      const r = simRound(hands, g.trick, g.lead, i, n, c);
+      const r = simRound(hands, g.trick, g.lead, i, n, c, pol);
       let sc = r.picker === i ? -(r.size - 1) : 1;
-      if (r.picker !== -1 && r.picker !== i) sc += 0.7 * r.size;     // making someone else pick up is good
-      if (r.picker !== i) sc += 0.03 * rk(c);                         // get rid of high cards when it is safe
-      const mine = hands[i].length, others = hands.filter((h, p) => p !== i && g.hands[p].length > 0).map(h => h.length);
-      if (others.length) sc += 0.5 * (Math.min(...others) - mine);      // stay ahead in the race to finish
+      if (r.picker !== -1 && r.picker !== i) sc += 0.7 * r.size;      // making someone else pick up is good
+      if (r.picker !== i) sc += 0.03 * rk(c);                          // get rid of high cards when it is safe
+      const others = hands.filter((h, p) => p !== i && g.hands[p].length > 0).map(h => h.length);
+      if (others.length) sc += 0.5 * (Math.min(...others) - hands[i].length);   // stay ahead in the race to finish
       total.set(c, total.get(c) + sc);
     }
   }
-  return maxBy(cand, c => total.get(c) + Math.random() * 0.01);
+  return maxBy(cand, c => total.get(c) + Math.random() * 1e-6);
 }
 function botPick(room, i, level) {
   const g = room.game, ok = playable(g, i);
@@ -202,11 +294,12 @@ const rooms = new Map(); // code -> { code, players:[{sub,name,ws}], game, touch
 function send(ws, o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function push(room) {
   room.touched = Date.now();
+  if (room.game && room.game.winner >= 0) learnFrom(room);
   if (room.game && room.game.winner >= 0 && !room.lobbyTimer) room.lobbyTimer = setTimeout(() => { room.lobbyTimer = null; if (room.game && room.game.winner >= 0) toLobby(room); }, LOBBY_MS);
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
-      voice: room.voice || DEFAULT_VOICE,
+      voice: room.voice || DEFAULT_VOICE, learned: learn.games,
       players: room.players.map(q => ({ name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
       game: g && { counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
