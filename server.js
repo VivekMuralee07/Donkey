@@ -9,9 +9,10 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const AVATARS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const MAX_PLAYERS = 5;
 const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['🤖', '👾', '🎃', '🧠', '🛸'];
-// WebRTC voice chat: the server only relays the connection setup messages; the audio goes straight between the players' phones.
-// Set ICE_SERVERS on Render (JSON list, e.g. a TURN server) if some players cannot hear each other.
-const ICE = (() => { try { const j = JSON.parse(process.env.ICE_SERVERS || ''); if (Array.isArray(j) && j.length) return j; } catch (e) { /* use the default */ } return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]; })();
+// Voice chat: each player's microphone audio is sent to the server as small binary frames and the server forwards them
+// to the other players who joined voice. It travels over the same connection as the game, so it works on any network
+// (no direct phone-to-phone connection or TURN server needed).
+const VOICE_MAX_FRAME = 4000, VOICE_MAX_BYTES_PER_SEC = 60000;
 const BOT_MS = Number(process.env.BOT_MS) || 1000;
 
 const server = http.createServer((req, res) => {
@@ -312,7 +313,7 @@ function push(room) {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
       learned: learn.games,
-      players: room.players.map(q => ({ vid: q.vid, voice: !!q.voice, name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
+      players: room.players.map(q => ({ voice: !!q.voice, name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
       game: g && { gid: g.id, counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
   });
@@ -343,10 +344,24 @@ function leave(ws) {
 }
 setInterval(() => { const now = Date.now(); for (const [k, r] of rooms) if (now - r.touched > 6 * 3600e3 && r.players.every(p => !p.ws)) rooms.delete(k); }, 600e3);
 
+function relayVoice(ws, data) {
+  const room = ws.room;
+  if (!room || !data || data.length < 2 || data.length > VOICE_MAX_FRAME) return;
+  const me = room.players.find(p => p.ws === ws);
+  if (!me || !me.voice) return;
+  const now = Date.now();
+  if (!ws.vwin || now - ws.vwin > 1000) { ws.vwin = now; ws.vbytes = 0; }
+  if ((ws.vbytes += data.length) > VOICE_MAX_BYTES_PER_SEC) return;   // flood protection
+  const frame = Buffer.concat([Buffer.from([1, me.vn || 0]), Buffer.from(data)]);
+  for (const q of room.players) {
+    if (q !== me && q.voice && q.ws && q.ws.readyState === 1 && q.ws.bufferedAmount < 200000) q.ws.send(frame, { binary: true });
+  }
+}
 const wss = new WebSocketServer({ server });
 wss.on('connection', ws => {
   ws.user = null; ws.room = null;
-  ws.on('message', async raw => {
+  ws.on('message', async (raw, isBinary) => {
+    if (isBinary) { relayVoice(ws, raw); return; }
     let m; try { m = JSON.parse(raw); } catch { return; }
     try {
       if (m.type === 'join') {
@@ -364,10 +379,9 @@ wss.on('connection', ws => {
         else {
           const taken = new Set(room.players.map(q => q.avatar));
           const av = AVATARS.includes(m.avatar) && !taken.has(m.avatar) ? m.avatar : AVATARS.find(x => !taken.has(x));
-          room.players.push({ sub: ws.user.sub, name: ws.user.name, ws, avatar: av, vid: Math.random().toString(36).slice(2, 8) });
+          room.players.push({ sub: ws.user.sub, name: ws.user.name, ws, avatar: av, vn: ((room.vseq = (room.vseq || 0) + 1) % 250) + 1 });
         }
         ws.room = room;
-        send(ws, { type: 'ice', servers: ICE });
         send(ws, { type: 'chatlog', msgs: (room.chat || []).map(x => chatView(x, ws.user.sub)) });
         return push(room);
       }
@@ -377,15 +391,9 @@ wss.on('connection', ws => {
       if (m.type === 'vjoin') {
         if (idx < 0 || room.players[idx].bot) return;
         room.players[idx].voice = true;
-        send(ws, { type: 'vlist', peers: room.players.filter((q, k) => k !== idx && q.voice && q.ws).map(q => q.vid) });
         return push(room);
       }
       if (m.type === 'vleave') { if (idx >= 0) { room.players[idx].voice = false; push(room); } return; }
-      if (m.type === 'vsig') {
-        const target = room.players.find(q => q.vid === m.to && q.ws && q.voice);
-        if (idx >= 0 && target && JSON.stringify(m.data || {}).length < 12000) send(target.ws, { type: 'vsig', from: room.players[idx].vid, data: m.data });
-        return;
-      }
       if (m.type === 'chat') {
         const text = String(m.text || '').replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 200), now = Date.now();
         if (!text || idx < 0 || now - (ws.lastChat || 0) < 400) return;

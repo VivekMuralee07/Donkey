@@ -103,6 +103,7 @@ button:disabled{opacity:.4}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:130;background:#000d;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;box-shadow:0 4px 14px #000a}
 #vj,#mic,#vx{position:fixed;top:max(8px,env(safe-area-inset-top));z-index:99;width:40px;height:40px;padding:0;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:19px;background:#000a;color:#fff;box-shadow:inset 0 0 0 1px #ffffff40,0 3px 8px #0008}
 #vj{right:106px;box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}#mic{right:106px}#vx{right:154px}
+#mic.hear{box-shadow:inset 0 0 0 2px #5aa9ff,0 0 12px #5aa9ff}
 #mic.on{background:#1f7a46;box-shadow:inset 0 0 0 2px #3ddc84,0 3px 8px #0008}#mic.off{background:#7a1f24;box-shadow:inset 0 0 0 2px #e5484d,0 3px 8px #0008}
 body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
@@ -134,7 +135,7 @@ body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 <li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. Among the other players, the one left with the most cards is the Donkey 🫏.</li>
 <li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
 <li><b>After the game:</b> tap Back to lobby when you are ready. There you can change avatars, add bots and deal again.</li>
-<li><b>Voice talk:</b> when two or more real players are in the room, tap 🎙 to join voice. Tap the green 🎤 to mute or unmute your microphone, and 📴 to leave voice. Bots are not part of voice.</li>
+<li><b>Voice talk:</b> when two or more real players are in the room, tap 🎙 to join voice. Tap the green 🎤 to mute or unmute your microphone, and 📴 to leave voice. It works on any network. Bots are not part of voice.</li>
 <li><b>Chat:</b> tap the 💬 button to type messages to the other players in your room.</li>
 </ul></div></div>
 <button id="cb" aria-label="Chat" style="display:none">💬<span id="cbd" hidden></span></button>
@@ -241,58 +242,69 @@ function openStats(){
 }
 statsEl.onclick=e=>{if(e.target===statsEl)statsEl.hidden=true};
 document.getElementById('sx').onclick=()=>{statsEl.hidden=true};
-/* ---- voice chat (WebRTC): the audio goes directly between the players' phones, the server only relays the set-up messages ---- */
-let inVoice=false,micOn=false,localStream=null,iceServers=[{urls:'stun:stun.l.google.com:19302'}],peers={},pendC={},lastVjoin=0;
+/* ---- voice chat through the game server: works on any network (Wi-Fi, mobile data, different cities) ---- */
+const VR=16000,CH=1280;   // 16 kHz mono, 80 ms chunks, 8-bit mu-law (about 128 kbit/s, only while someone is talking)
+const MU=new Float32Array(256);for(let b=0;b<256;b++){const y=b/255*2-1;MU[b]=Math.sign(y)*(Math.pow(256,Math.abs(y))-1)/255}
+const muEnc=s=>{s=Math.max(-1,Math.min(1,s));return Math.round((Math.sign(s)*Math.log(1+255*Math.abs(s))/Math.log(256)+1)/2*255)};
+let inVoice=false,micOn=false,vctx=null,micStream=null,micSrc=null,micNode=null,lastVjoin=0,hearing=false,hearT=0;
+let acc=[],rsPos=0,lp=0,hang=0,sendingNow=false,prevChunk=null,spk={};
 const vjBtn=document.getElementById('vj'),micBtn=document.getElementById('mic'),vxBtn=document.getElementById('vx');
-function closePeer(v){const p=peers[v];if(!p)return;try{p.pc.close()}catch(e){}if(p.el){try{p.el.srcObject=null;p.el.remove()}catch(e){}}delete peers[v]}
-function makePeer(v,initiator){
-  closePeer(v);
-  const pc=new RTCPeerConnection({iceServers}),p={pc,el:null};peers[v]=p;
-  pc.onicecandidate=e=>{if(e.candidate)send({type:'vsig',to:v,data:{c:e.candidate}})};
-  pc.ontrack=e=>{if(!p.el){p.el=document.createElement('audio');p.el.autoplay=true;p.el.setAttribute('playsinline','');document.body.appendChild(p.el)}
-    p.el.srcObject=(e.streams&&e.streams[0])||new MediaStream([e.track]);const pr=p.el.play&&p.el.play();if(pr&&pr.catch)pr.catch(()=>{})};
-  pc.onconnectionstatechange=()=>{if(pc.connectionState==='failed')toast('A voice link failed (that network blocks direct audio)')};
-  if(initiator){
-    if(localStream)localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));else pc.addTransceiver('audio',{direction:'recvonly'});
-    pc.createOffer().then(o=>pc.setLocalDescription(o)).then(()=>send({type:'vsig',to:v,data:{d:pc.localDescription}})).catch(()=>{});
-  }
-  return p;
+function sendFrame(c){
+  if(!ws||ws.readyState!==1||ws.bufferedAmount>100000)return;
+  const u=new Uint8Array(c.length);for(let i=0;i<c.length;i++)u[i]=muEnc(c[i]);ws.send(u);
 }
-async function flushC(v){const p=peers[v];if(!p||!p.pc.remoteDescription)return;const q=pendC[v]||[];delete pendC[v];for(const c of q){try{await p.pc.addIceCandidate(c)}catch(e){}}}
-async function onVsig(from,data){
-  try{
-    if(data.d&&data.d.type==='offer'){
-      const p=makePeer(from,false);
-      await p.pc.setRemoteDescription(data.d);
-      if(localStream)localStream.getTracks().forEach(t=>p.pc.addTrack(t,localStream));
-      await p.pc.setLocalDescription(await p.pc.createAnswer());
-      send({type:'vsig',to:from,data:{d:p.pc.localDescription}});flushC(from);
-    }else if(data.d){const p=peers[from];if(p){await p.pc.setRemoteDescription(data.d);flushC(from)}}
-    else if(data.c){const p=peers[from];if(p&&p.pc.remoteDescription){try{await p.pc.addIceCandidate(data.c)}catch(e){}}else(pendC[from]=pendC[from]||[]).push(data.c)}
-  }catch(e){}
+function chunkOut(c){   // only send while there is sound (plus a short tail and the chunk before the first word)
+  let s=0;for(let i=0;i<c.length;i++)s+=c[i]*c[i];
+  const loud=Math.sqrt(s/c.length)>0.012;if(loud)hang=6;
+  if(hang>0){if(!sendingNow&&prevChunk)sendFrame(prevChunk);sendFrame(c);sendingNow=true;if(!loud)hang--}else sendingNow=false;
+  prevChunk=c;
+}
+function micSamples(x){   // microphone samples (44.1/48 kHz) -> 16 kHz chunks
+  const r=vctx.sampleRate/VR,f=new Float32Array(x.length);
+  for(let i=0;i<x.length;i++){lp+=0.55*(x[i]-lp);f[i]=lp}
+  for(;rsPos<f.length;rsPos+=r){const i=Math.floor(rsPos),fr=rsPos-i,a=f[i],b=i+1<f.length?f[i+1]:a;acc.push(a+(b-a)*fr)}
+  rsPos-=f.length;
+  while(acc.length>=CH)chunkOut(Float32Array.from(acc.splice(0,CH)));
+}
+function startCapture(){
+  acc=[];rsPos=0;lp=0;hang=0;sendingNow=false;prevChunk=null;
+  micSrc=vctx.createMediaStreamSource(micStream);
+  micNode=vctx.createScriptProcessor(2048,1,1);
+  const quiet=vctx.createGain();quiet.gain.value=0;   // keeps the processor running without playing your own voice back
+  micNode.onaudioprocess=e=>{if(micOn)micSamples(e.inputBuffer.getChannelData(0))};
+  micSrc.connect(micNode);micNode.connect(quiet);quiet.connect(vctx.destination);
+}
+function playChunk(vn,u8){   // audio from another player: a small buffer per speaker keeps it smooth
+  if(!inVoice||!vctx)return;
+  if(vctx.state==='suspended'){try{vctx.resume()}catch(e){}}
+  const n=u8.length,buf=vctx.createBuffer(1,n,VR),d=buf.getChannelData(0);for(let i=0;i<n;i++)d[i]=MU[u8[i]];
+  const src=vctx.createBufferSource();src.buffer=buf;src.connect(vctx.destination);
+  const now=vctx.currentTime;let t=spk[vn]||0;if(t<now+0.03)t=now+0.15;if(t>now+0.8)return;   // drop audio that arrives far too late
+  src.start(t);spk[vn]=t+n/VR;
+  hearing=true;if(micBtn.classList)micBtn.classList.add('hear');clearTimeout(hearT);hearT=setTimeout(()=>{hearing=false;if(micBtn.classList)micBtn.classList.remove('hear')},400);
 }
 async function joinVoice(){
   if(inVoice)return;
-  if(!window.RTCPeerConnection){toast('Voice chat is not supported in this browser');return}
-  try{localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});micOn=true}
-  catch(e){localStream=null;micOn=false;toast('Microphone not allowed. You can listen only.')}
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC){toast('Voice chat is not supported in this browser');return}
+  try{vctx=vctx||new AC();if(vctx.state==='suspended')await vctx.resume()}catch(e){}
+  try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});startCapture();micOn=true}
+  catch(e){micStream=null;micOn=false;toast('Microphone not allowed. You can listen only.')}
   inVoice=true;lastVjoin=Date.now();send({type:'vjoin'});draw();
 }
 function leaveVoice(){
   if(!inVoice)return;inVoice=false;
-  Object.keys(peers).forEach(closePeer);pendC={};
-  if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}
-  micOn=false;send({type:'vleave'});draw();
+  try{if(micNode)micNode.disconnect();if(micSrc)micSrc.disconnect()}catch(e){}
+  micNode=micSrc=null;if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null}
+  spk={};micOn=false;send({type:'vleave'});draw();
 }
 function toggleMic(){
-  if(!localStream){toast('No microphone access. Allow it in your browser settings, then leave and join voice again.');return}
-  micOn=!micOn;localStream.getAudioTracks().forEach(t=>{t.enabled=micOn});draw();
+  if(!micStream){toast('No microphone access. Allow it in your browser settings, then leave and join voice again.');return}
+  micOn=!micOn;draw();
 }
-function syncVoice(){   // runs with every state update: drop links to players who left voice, rejoin voice after a reconnect
-  if(!S)return;
-  const me=S.players[S.me],others=new Set(S.players.filter((p,i)=>i!==S.me&&p.voice).map(p=>p.vid));
-  Object.keys(peers).forEach(v=>{if(!others.has(v))closePeer(v)});
-  if(inVoice&&me&&!me.voice&&Date.now()-lastVjoin>2500){Object.keys(peers).forEach(closePeer);lastVjoin=Date.now();send({type:'vjoin'})}
+function syncVoice(){   // after a reconnect the server forgets we were in voice: tell it again
+  if(!S||!inVoice)return;const me=S.players[S.me];
+  if(me&&!me.voice&&Date.now()-lastVjoin>2500){lastVjoin=Date.now();send({type:'vjoin'})}
 }
 vjBtn.onclick=joinVoice;micBtn.onclick=toggleMic;vxBtn.onclick=leaveVoice;
 /* The Donkey = the player(s) holding the most cards among everybody except the winner. */
@@ -303,9 +315,11 @@ function donkeys(counts,winner){
   return rest.filter(i=>counts[i]===mx);
 }
 function connect(){
-  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);
+  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);ws.binaryType='arraybuffer';
   ws.onopen=()=>{if(room&&uname&&S)join();draw()};
-  ws.onmessage=e=>{const m=JSON.parse(e.data);
+  ws.onmessage=e=>{
+    if(typeof e.data!=='string'){const u=new Uint8Array(e.data);if(u[0]===1&&u.length>2)playChunk(u[1],u.subarray(2));return}
+    const m=JSON.parse(e.data);
     if(m.type==='state'){const pg=S&&S.game,ng=m.game;recordResult(m);
       if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
       else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
@@ -313,9 +327,6 @@ function connect(){
       S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='chatlog'){chatMsgs=m.msgs||[];unread=0;renderChat()}
     else if(m.type==='chat'){chatMsgs.push(m.msg);if(chatMsgs.length>60)chatMsgs.shift();if(chatEl.hidden&&!m.msg.mine)unread++;renderChat()}
-    else if(m.type==='ice'){if(Array.isArray(m.servers)&&m.servers.length)iceServers=m.servers}
-    else if(m.type==='vlist'){(m.peers||[]).forEach(v=>makePeer(v,true))}
-    else if(m.type==='vsig'){onVsig(m.from,m.data||{})}
     else if(m.type==='error'){err=m.text;if(m.left)S=null}
     if(m.type==='state')syncVoice();
     draw()};
@@ -412,7 +423,7 @@ function draw(){
   if(document.body&&document.body.classList)document.body.classList.toggle('tb',!!tableMode);
   if(vjBtn.style){const humans=S?S.players.filter(p=>!p.bot).length:0;
     vjBtn.style.display=(S&&humans>=2&&!inVoice)?'flex':'none';micBtn.style.display=vxBtn.style.display=inVoice?'flex':'none';
-    micBtn.className=micOn?'on':'off';micBtn.textContent=micOn?'🎤':'🔇'}
+    micBtn.className=(micOn?'on':'off')+(hearing?' hear':'');micBtn.textContent=micOn?'🎤':'🔇'}
   if(cb.style){cb.style.display=S?'flex':'none';if(!S){chatEl.hidden=true;chatMsgs=[];unread=0}}
 }
 document.addEventListener('focusout',()=>{if(pendingDraw)setTimeout(()=>{if(!typingInApp())draw()},400)});
