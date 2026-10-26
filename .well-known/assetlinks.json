@@ -3,6 +3,6 @@
       "target": {
         "namespace": "android_app",
         "package_name": "com.vivek.donkey_aev6.twa",
-        "sha256_cert_fingerprints": ["E5:B8:D6:43:C4:57:F8:3C:9C:33:45:87:EF:8C:1C:5C:B7:8C:8C:18:4B:0A:0E:83:03:84:04:C7:82:78:1C:AF"]
+        "sha256_cert_fingerprints": ["7F:9E:C0:59:04:85:8F:1F:D7:18:43:F7:99:94:2A:24:C0:04:F0:C9:B8:76:8C:4A:9E:4E:52:F7:12:8E:59:DC"]
       }
     }]
