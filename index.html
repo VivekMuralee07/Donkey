@@ -93,6 +93,12 @@ button:disabled{opacity:.4}
 .cl{overflow:auto;min-height:110px;max-height:34vh;font-size:14px;line-height:1.4;padding:4px 2px}
 .cl .m{margin:5px 0;word-break:break-word}.cl .m b{color:#ffe08a}.cl .m.me{text-align:right}.cl .m.me b{color:#9ff0b8}
 .cr{display:flex;gap:8px}.cr input{margin:0;text-transform:none;letter-spacing:0;font-size:16px;text-align:left;flex:1}.cr button{padding:10px 16px}
+.opts{display:flex;flex-direction:column;gap:8px;margin:6px 0 4px}
+.opt{border-radius:12px;background:#ffffff14;color:#fff;box-shadow:inset 0 0 0 1px #ffffff30;padding:12px;font-size:15px}
+.opt.on{background:linear-gradient(180deg,#ffd75e,#e8a91c);color:#3a2600;box-shadow:0 4px 0 #8a5a00,0 6px 12px #0006}
+.ranks{margin:8px auto;max-width:380px}
+.rrow{display:flex;align-items:center;gap:10px;background:#00000045;border-radius:12px;padding:8px 12px;margin:6px 0;text-align:left;font-size:15px}
+.rrow.meRow{box-shadow:inset 0 0 0 2px var(--gold)}.rm{font-size:24px;width:32px;text-align:center}.rn{flex:1;font-weight:800}.ro{font-size:12px;color:#cfe8d9}
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 12px}
 .tile{background:#ffffff12;border:1px solid #ffffff1c;border-radius:12px;padding:10px 6px;text-align:center}
 .tile b{display:block;font-size:26px;color:var(--gold);line-height:1.1}.tile span{font-size:12px;color:var(--mut)}
@@ -132,8 +138,8 @@ body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 <li><b>Follow suit:</b> if you have a card of the suit that was led, you must play one.</li>
 <li><b>Everyone follows suit:</b> when every player has played a card of that suit, the round ends and those cards are set aside. The player with the highest card leads the next round.</li>
 <li><b>No card of that suit:</b> you play any card and the round stops right there. The player with the highest card of the led suit picks up all the cards on the table and leads next.</li>
-<li><b>Winning:</b> the first player to run out of cards wins. This is checked when a round ends. Among the other players, the one left with the most cards is the Donkey 🫏.</li>
-<li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins.</li>
+<li><b>Game type:</b> choose it in the room before you deal. <i>Play until first winner</i> ends the game as soon as one player runs out of cards (checked when a round ends). Among the other players, the one left with the most cards is the Donkey 🫏. <i>Play until last position</i> goes on after that: players who finish leave the game and the rest keep playing until every position is decided. The last player left is the Donkey.</li>
+<li><b>Early finish:</b> if a player's cards are all one suit, and they must play that suit, and the next player has none of that suit, the game ends and the next player wins. In a last-position game that next player takes the next place and play continues.</li>
 <li><b>After the game:</b> tap Back to lobby when you are ready. There you can change avatars, add bots and deal again.</li>
 <li><b>Voice talk:</b> when two or more real players are in the room, tap 🎙 to join voice. Tap the green 🎤 to mute or unmute your microphone, and 📴 to leave voice. It works on any network. Bots are not part of voice.</li>
 <li><b>Chat:</b> tap the 💬 button to type messages to the other players in your room.</li>
@@ -214,7 +220,7 @@ const STATS_KEY='dk_stats',statsEl=document.getElementById('stats');
 function loadStats(){try{const s=JSON.parse(localStorage.getItem(STATS_KEY));if(s&&typeof s.m==='number')return s}catch(e){}return {m:0,w:0,l:0,h:'',last:''}}
 function saveStats(s){try{localStorage.setItem(STATS_KEY,JSON.stringify(s))}catch(e){}}
 function recordResult(m){   // called with every state; counts each finished game exactly once
-  const ng=m.game;if(!ng||ng.winner<0)return;
+  const ng=m.game;if(!ng||!ng.over)return;
   const gid=ng.gid||(m.room+':'+ng.seq+':'+ng.winner),s=loadStats();if(s.last===gid)return;
   const win=ng.winner===m.me;s.m++;if(win)s.w++;else s.l++;s.h=((s.h||'')+(win?'1':'0')).slice(-200);s.last=gid;saveStats(s);
 }
@@ -307,7 +313,9 @@ function syncVoice(){   // after a reconnect the server forgets we were in voice
   if(me&&!me.voice&&Date.now()-lastVjoin>2500){lastVjoin=Date.now();send({type:'vjoin'})}
 }
 vjBtn.onclick=joinVoice;micBtn.onclick=toggleMic;vxBtn.onclick=leaveVoice;
-/* The Donkey = the player(s) holding the most cards among everybody except the winner. */
+const ORD=['1st','2nd','3rd','4th','5th'],MED=['🥇','🥈','🥉'],medal=k=>MED[k]||ORD[k];
+/* Game type 2 (play until last position): the Donkey is the last player. Game type 1: whoever holds the most cards among everybody except the winner. */
+const isDonkey=(g,me)=>g.mode===2?(g.ranks.length>1&&g.ranks[g.ranks.length-1]===me):donkeys(g.counts,g.winner).includes(me);
 function donkeys(counts,winner){
   const rest=counts.map((c,i)=>i).filter(i=>i!==winner);
   if(!rest.length)return [];
@@ -321,9 +329,9 @@ function connect(){
     if(typeof e.data!=='string'){const u=new Uint8Array(e.data);if(u[0]===1&&u.length>2)playChunk(u[1],u.subarray(2));return}
     const m=JSON.parse(e.data);
     if(m.type==='state'){const pg=S&&S.game,ng=m.game;recordResult(m);
-      if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
-      else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
-      if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const sad=donkeys(ng.counts,ng.winner).includes(m.me);sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
+      if(ng&&ng.first&&(!pg||pg.over)){animHand=true;sfx('start')}
+      else if(ng&&pg&&!ng.over&&ng.seq>pg.seq)sfx('card');
+      if(ng&&ng.over&&(!pg||!pg.over)){const sad=isDonkey(ng,m.me);sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
       S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='chatlog'){chatMsgs=m.msgs||[];unread=0;renderChat()}
     else if(m.type==='chat'){chatMsgs.push(m.msg);if(chatMsgs.length>60)chatMsgs.shift();if(chatEl.hidden&&!m.msg.mine)unread++;renderChat()}
@@ -375,6 +383,8 @@ function render(){
     h+='</div>';
     const hasBot=S.players.some(p=>p.bot);
     h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div>`;
+    const gm=S.mode===2?2:1;
+    h+=`<div class="sub" style="margin-top:12px">Game type</div><div class="opts"><button class="opt ${gm===1?'on':''}" data-m="1">🏆 Play until first winner</button><button class="opt ${gm===2?'on':''}" data-m="2">🏅 Play until last position</button></div>`;
     h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<button id="st" style="margin-top:12px">Deal the cards (${n} players)</button>`;
     $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button></div>`;
     document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;err='';sel=null;winAt=0;prevTL=0;draw()};
@@ -382,27 +392,31 @@ function render(){
     const iv2=document.getElementById('inv2');if(iv2)iv2.onclick=()=>shareInvite(S.room);
     const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot',level:botLevel});
     $.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{botLevel=b.dataset.l;try{localStorage.setItem('dk_lvl',botLevel)}catch(e){}draw()});
+    $.querySelectorAll('.opt').forEach(b=>b.onclick=()=>send({type:'mode',mode:+b.dataset.m}));
     const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
     const b=document.getElementById('st');if(b)b.onclick=()=>send({type:'start'});return}
-  const g=S.game,me=S.me,N=S.players.length,my=g.turn===me&&g.winner<0,P=S.players,av=i=>P[i].avatar||'🙂';
-  const ok=new Set(g.ok);tableMode=true;winAt=g.winner>=0?(winAt||Date.now()):0;
+  const g=S.game,me=S.me,N=S.players.length,out=g.ranks.indexOf(me)>=0,my=g.turn===me&&!g.over&&!out,P=S.players,av=i=>P[i].avatar||'🙂';
+  const ok=new Set(g.ok);tableMode=true;winAt=g.over?(winAt||Date.now()):0;
   if(sel!==null){const c=parseInt(sel,10);if(!my||!ok.has(c)||!g.hand.includes(c))sel=null}
-  const opp=i=>`<div class="opp ${g.turn===i&&g.winner<0?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].voice?' 🎙':''}${P[i].online?'':' ⚠'}<div class="cnt">${g.counts[i]} card${g.counts[i]==1?'':'s'}</div><div class="fan">${'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`;
+  const opp=i=>{const ri=g.ranks.indexOf(i);return `<div class="opp ${!g.over&&g.turn===i?'turn':''}"><div class="av">${av(i)}</div><b>${esc(P[i].name)}</b>${P[i].voice?' 🎙':''}${P[i].online?'':' ⚠'}<div class="cnt">${ri>=0&&!(g.over&&ri===g.ranks.length-1&&g.mode===2)?medal(ri)+' '+ORD[ri]:g.counts[i]+' card'+(g.counts[i]==1?'':'s')}</div><div class="fan">${ri>=0?'':'<div class="back"></div>'.repeat(Math.min(g.counts[i],8))}</div></div>`};
   let h=`<div class="table c${lvl>=5?3:lvl>=3?2:lvl>=1?1:0}" style="min-height:${Math.max(300,(window.innerHeight||800)-112)}px"><div class="top">${[...Array(N-1).keys()].map(k=>opp((me+1+k)%N)).join('')}</div><div class="center${(g.trick.length||g.last.length)>6?' dense':''}">`;
   if(g.trick.length)g.trick.forEach((t,ti)=>h+=`<div>${card(t.c,ti>=prevTL?'pl':'')}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   else g.last.forEach(t=>h+=`<div style="opacity:.6">${card(t.c)}<span class="who">${av(t.p)} ${esc(P[t.p].name)}${t.off?' (no suit)':''}</span></div>`);
   prevTL=g.trick.length;
   h+='</div>';
-  if(g.winner>=0){const dk=donkeys(g.counts,g.winner);
+  if(g.over&&g.mode===2){
+    const L=g.ranks.length-1;
+    h+=`<div class="win"><span class="trophy">🏆</span> Final positions</div><div class="ranks">${g.ranks.map((p,k)=>`<div class="rrow ${p===me?'meRow':''}"><span class="rm">${k===L&&L>0?'🫏':medal(k)}</span><span class="rn">${av(p)} ${esc(P[p].name)}${p===me?' (you)':''}</span><span class="ro">${ORD[k]}${k===L&&L>0?' · Donkey':''}</span></div>`).join('')}</div><div style="text-align:center"><button id="ag">Back to lobby</button></div>`}
+  else if(g.over){const dk=donkeys(g.counts,g.winner);
     h+=`<div class="win"><span class="trophy">🏆</span> ${av(g.winner)} ${esc(P[g.winner].name)} ${g.early?'wins!':'finished first!'}</div>${g.early?`<div class="msg">${esc(g.msg)}</div>`:''}<div class="msg donk"><span class="don">🫏</span> ${dk.map(i=>av(i)+' '+esc(P[i].name)).join(' and ')} ${dk.length>1?'are the Donkeys':'is the Donkey'} (${g.counts[dk[0]]} cards left)</div><div style="text-align:center"><button id="ag">Back to lobby</button></div>`}
-  else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><span class="pill ${my?'mine':''}">${my?'👉 Your turn':av(g.turn)+' '+esc(P[g.turn].name)+'’s turn'}</span></div>`;
-  h+=`<div class="me ${my?'turn':''}"><span class="av">${av(me)}</span><span>${esc(P[me].name)} (you) · ${g.hand.length} cards</span></div>`;
-  if(g.winner<0){
+  else h+=`<div class="msg">${esc(g.msg)}</div><div class="msg"><span class="pill ${my?'mine':''}">${out?'🏅 You finished '+ORD[g.ranks.indexOf(me)]+'! Watching the others…':my?'👉 Your turn':av(g.turn)+' '+esc(P[g.turn].name)+'’s turn'}</span></div>`;
+  h+=`<div class="me ${my?'turn':''}"><span class="av">${av(me)}</span><span>${esc(P[me].name)} (you) · ${out?medal(g.ranks.indexOf(me))+' '+ORD[g.ranks.indexOf(me)]:g.hand.length+' cards'}</span></div>`;
+  if(!g.over&&!out){
     if(my&&sel!==null){const c=parseInt(sel,10);h+=`<div class="bar"><button id="pl">Play ${rl(rk(c))}${SU[su(c)]}</button><button id="cx" class="sec">Cancel</button></div>`}
     else if(my)h+=`<div class="bar"><div class="hint">${g.trick.length&&!g.hand.some(c=>su(c)===g.lead)?`No ${SU[g.lead]}? Tap any card. ${av(g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p)} ${esc(P[g.trick.slice().sort((a,b)=>rk(b.c)-rk(a.c))[0].p].name)} (highest so far) will pick up all the cards on the table.`:'Tap a glowing card, then press Play.'}</div></div>`;
     else h+='<div class="bar"><div class="hint">Waiting for '+esc(P[g.turn].name)+'…</div></div>';
   }
-  h+=handHTML(g.hand,my,ok);
+  if(!out)h+=handHTML(g.hand,my,ok);
   $.innerHTML=h+`</div><div class="err">${esc(err)}</div></div>`;
   $.querySelectorAll('.card.ok').forEach(e=>e.onclick=()=>{sel=sel===e.dataset.k?null:e.dataset.k;draw()});
   const pl=document.getElementById('pl');if(pl)pl.onclick=()=>{const c=parseInt(sel,10);sel=null;send({type:'play',card:c})};

@@ -44,7 +44,7 @@ function newGame(room) {
     pool.forEach((c, i) => hands[(start + i) % n].push(c));
   } while (!hands.some(h => h.includes(ACE_SPADES)));
   const first = hands.findIndex(h => h.includes(ACE_SPADES));
-  room.game = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), hands, trick: [], turn: first, lead: -1, first: true, winner: -1, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []), obs: Array.from({ length: n }, () => newStats()),
+  room.game = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), hands, trick: [], turn: first, lead: -1, first: true, winner: -1, mode: room.mode === 2 ? 2 : 1, ranks: [], over: false, last: [], seq: 0, seen: [], voids: Array.from({ length: n }, () => []), obs: Array.from({ length: n }, () => newStats()),
     msg: room.players[first].name + ' holds the Ace of Spades and starts.' };
 }
 function playable(g, i) {
@@ -54,9 +54,24 @@ function playable(g, i) {
   const f = h.filter(c => su(c) === g.lead);
   return f.length ? f : h;
 }
+// Finishing order. Game type 1: the game is over as soon as the first player is out of cards.
+// Game type 2: players leave the game one by one (1st, 2nd, ...); it is over when only one player is left, who is last (the Donkey).
+const isOut = (g, p) => g.ranks.indexOf(p) >= 0;
+function nextActive(g, i, n) { for (let k = 1; k <= n; k++) { const j = (i + k) % n; if (!isOut(g, j)) return j; } return -1; }
+function finishIfDone(g, n) {
+  if (g.mode !== 2) { if (g.ranks.length) g.over = true; return; }
+  if (n - g.ranks.length <= 1) { for (let p = 0; p < n; p++) if (!isOut(g, p)) g.ranks.push(p); g.over = true; }
+}
+const ORD = ['1st', '2nd', '3rd', '4th', '5th'];
+function rankNote(P, g, placed) {
+  const parts = placed.map(k => P[k].name + ' finishes ' + ORD[g.ranks.indexOf(k)] + '!');
+  if (g.over) { const last = g.ranks[g.ranks.length - 1]; if (!placed.includes(last)) parts.push(P[last].name + ' is last: the Donkey.'); }
+  return parts.join(' ');
+}
 function playCore(room, i, c) {
   const g = room.game, P = room.players, n = P.length;
-  if (!g || g.winner >= 0 || g.turn !== i) return false;
+  if (!g || g.over || g.turn !== i) return false;
+  const na = n - g.ranks.length;   // players still in the game
   const okc = playable(g, i);
   if (!okc.includes(c)) return false;
   if (!g.sim && okc.length > 1) record(g, i, c, okc);   // bots learn from every real move
@@ -65,7 +80,7 @@ function playCore(room, i, c) {
   if (!g.trick.length) { g.lead = su(c); g.first = false; g.avoid = null; }
   const off = su(c) !== g.lead;
   g.trick.push({ p: i, c, off });
-  if (!off && g.trick.length < n) { g.turn = (i + 1) % n; g.msg = P[i].name + ' played ' + name(c) + '.'; return true; }
+  if (!off && g.trick.length < na) { g.turn = nextActive(g, i, n); g.msg = P[i].name + ' played ' + name(c) + '.'; return true; }
   // The round ends: everyone followed suit, or someone had no card of the lead suit.
   const t = g.trick;
   let next;
@@ -83,9 +98,16 @@ function playCore(room, i, c) {
     next = top.p;
     g.seen.push(...t.map(x => x.c));              // cards set aside are out of the game
   }
-  g.last = t; g.trick = []; g.turn = next; g.lead = -1;
-  const fin = t.map(x => x.p).concat([next]).find(k => g.hands[k].length === 0);
-  if (fin !== undefined) g.winner = fin;
+  g.last = t; g.trick = []; g.lead = -1;
+  // Who has no cards left? Checked when the round ends, so a player who just picked the table up is not out.
+  const done = [...new Set(t.map(x => x.p).concat([next]))].filter(k => g.hands[k].length === 0 && !isOut(g, k));
+  const placed = g.mode === 2 ? done : done.slice(0, 1);
+  placed.forEach(k => g.ranks.push(k));
+  if (g.ranks.length) g.winner = g.ranks[0];
+  finishIfDone(g, n);
+  if (g.mode === 2 && placed.length) g.msg += ' ' + rankNote(P, g, placed);
+  const nx = isOut(g, next) ? nextActive(g, next, n) : next;
+  g.turn = nx < 0 ? next : nx;
   return true;
 }
 
@@ -197,7 +219,7 @@ function sampleHands(unknown, rest, sizes, voids) {
 }
 // Play out the rest of ONE round. Opponents choose with their own style: a learned model for humans, the real
 // brain for bots (easy = random, otherwise medium). Returns who picks up the table (-1 = cards set aside).
-function simRound(hands, trick, lead, turn, n, first, pol) {
+function simRound(hands, trick, lead, turn, n, first, pol, nextA) {
   trick = trick.map(x => ({ ...x }));
   let c = first;
   for (;;) {
@@ -207,7 +229,7 @@ function simRound(hands, trick, lead, turn, n, first, pol) {
     trick.push({ p: turn, c, off });
     if (off) { const hi = topOf(trick.filter(x => !x.off)); hands[hi.p].push(...trick.map(x => x.c)); return { picker: hi.p, size: trick.length }; }
     if (trick.length >= n) return { picker: -1, size: trick.length };
-    turn = (turn + 1) % n;
+    turn = nextA(turn);
     c = pol(turn, hands, trick, lead);
   }
 }
@@ -229,19 +251,20 @@ function prune(ok, sep) {
 }
 function hardPick(room, i, ok) {
   const g = room.game, n = room.players.length, t0 = Date.now();
+  const na = n - g.ranks.length, nextA = p => nextActive(g, p, n);   // players who already finished are skipped
   const known = new Set([...g.hands[i], ...g.trick.map(x => x.c), ...g.seen]), unknown = [];
   for (let c = 0; c < 52; c++) if (!known.has(c)) unknown.push(c);
   const cand = prune(ok, new Set([...unknown, ...g.trick.map(x => x.c)]));
   if (cand.length === 1) return cand[0];
   const acted = new Set(g.trick.map(x => x.p)), rest = [], sizes = g.hands.map(h => h.length);
-  for (let k = 1; k < n; k++) { const p = (i + k) % n; if (acted.has(p)) break; rest.push(p); }   // players still to act this round
+  for (let k = 1; k < n; k++) { const p = (i + k) % n; if (isOut(g, p)) continue; if (acted.has(p)) break; rest.push(p); }   // players still to act this round
   const models = room.players.map((p, k) => (p.bot || k === i ? null : buildModel(room, g, k)));
   const pol = (q, hands, trick, lead) => {
     const hand = hands[q], legalNow = legal(hand, trick, lead), pl = room.players[q];
     if (legalNow.length === 1) return legalNow[0];
     if (pl.bot && pl.level === 'easy') return legalNow[Math.floor(Math.random() * legalNow.length)];
     if (!pl.bot && models[q]) return modelPick(legalNow, ctxOf(hand, trick, lead, legalNow), models[q]);
-    return mediumPick(hand, trick, lead, n);
+    return mediumPick(hand, trick, lead, na);
   };
   const total = new Map(cand.map(c => [c, 0]));
   for (let s = 0; s < 300; s++) {
@@ -249,7 +272,7 @@ function hardPick(room, i, ok) {
     const hs = sampleHands(unknown, rest, sizes, g.voids);
     for (const c of cand) {
       const hands = g.hands.map(h => h.slice()); rest.forEach(p => { hands[p] = hs[p].slice(); });
-      const r = simRound(hands, g.trick, g.lead, i, n, c, pol);
+      const r = simRound(hands, g.trick, g.lead, i, na, c, pol, nextA);
       let sc = r.picker === i ? -(r.size - 1) : 1;
       if (r.picker !== -1 && r.picker !== i) sc += 0.7 * r.size;      // making someone else pick up is good
       if (r.picker !== i) sc += 0.03 * rk(c);                          // get rid of high cards when it is safe
@@ -268,7 +291,7 @@ function botPick(room, i, level) {
     if (alt.length) ok = alt;
   }
   if (ok.length <= 1 || !LEVELS.includes(level) || level === 'easy') return ok[Math.floor(Math.random() * ok.length)];
-  if (level === 'medium') return mediumPick(g.hands[i], g.trick, g.lead, room.players.length, g.voids, i, ok);
+  if (level === 'medium') return mediumPick(g.hands[i], g.trick, g.lead, room.players.length - g.ranks.length, g.voids, i, ok);
   return hardPick(room, i, ok);
 }
 
@@ -277,22 +300,28 @@ function play(room, i, c) { if (!playCore(room, i, c)) return false; checkEarly(
 // Early finish: the player X whose turn it is holds cards of ONE suit only and has to play that suit, AND is stuck:
 // X is leading it, or every card X holds is higher than the highest card of that suit already on the table (so X cannot
 // avoid becoming the highest). If the next player Y has none of that suit, Y cuts and X would have to pick up the whole
-// table again and again. The game ends and Y wins.
+// table again and again. Y finishes: in game type 1 the game ends and Y wins; in game type 2 Y takes the next position
+// and the game goes on (it can repeat with the next player after Y, until X is last).
 // If X holds a LOWER card than the one on the table, X is not stuck: X plays it and the owner of the highest card picks up.
 function checkEarly(room) {
-  const g = room.game, n = room.players.length;
-  if (!g || g.winner >= 0) return;
-  const x = g.turn, hand = g.hands[x];
-  if (!hand.length) return;
-  const s = su(hand[0]);
-  if (!hand.every(c => su(c) === s)) return;
-  if (g.trick.length && g.lead !== s) return;   // x must follow a different suit, so the rule does not apply
-  if (g.trick.length + 1 >= n) return;          // x is last to play: the round simply ends with x's card
-  if (g.trick.length && Math.min(...hand.map(rk)) < Math.max(...g.trick.map(t => rk(t.c)))) return;   // x can play a lower card: not stuck
-  const y = (x + 1) % n;
-  if (!g.hands[y].length || g.hands[y].some(c => su(c) === s)) return;
-  g.winner = y; g.early = true;
-  g.msg = room.players[y].name + ' has no ' + SYM[s] + ' while ' + room.players[x].name + ' holds only ' + SYM[s] + '. ' + room.players[y].name + ' wins!';
+  const g = room.game, n = room.players.length, P = room.players;
+  while (g && !g.over) {
+    const x = g.turn, hand = g.hands[x], na = n - g.ranks.length;
+    if (!hand.length) return;
+    const s = su(hand[0]);
+    if (!hand.every(c => su(c) === s)) return;
+    if (g.trick.length && g.lead !== s) return;   // x must follow a different suit, so the rule does not apply
+    if (g.trick.length + 1 >= na) return;         // x is last to play: the round simply ends with x's card
+    if (g.trick.length && Math.min(...hand.map(rk)) < Math.max(...g.trick.map(t => rk(t.c)))) return;   // x can play a lower card: not stuck
+    const y = nextActive(g, x, n);
+    if (y < 0 || y === x || !g.hands[y].length || g.hands[y].some(c => su(c) === s)) return;
+    g.early = true;
+    g.ranks.push(y); if (g.ranks.length === 1) g.winner = y;
+    g.msg = P[y].name + ' has no ' + SYM[s] + ' while ' + P[x].name + ' holds only ' + SYM[s] + '. ';
+    if (g.mode === 2) { g.seen.push(...g.hands[y]); g.hands[y] = []; }
+    finishIfDone(g, n);
+    g.msg += g.mode === 2 ? rankNote(P, g, [y]) : P[y].name + ' wins!';
+  }
 }
 // After a game ends the result stays on screen until someone taps "Back to lobby"; then everybody returns to the lobby (room screen) to change avatars, add bots and deal again.
 function toLobby(room) {
@@ -308,27 +337,27 @@ const chatView = (m, sub) => ({ name: m.name, avatar: m.avatar, text: m.text, t:
 function send(ws, o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
 function push(room) {
   room.touched = Date.now();
-  if (room.game && room.game.winner >= 0) learnFrom(room);
+  if (room.game && room.game.over) learnFrom(room);
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
-      learned: learn.games,
+      learned: learn.games, mode: room.mode === 2 ? 2 : 1,
       players: room.players.map(q => ({ voice: !!q.voice, name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
       game: g && { gid: g.id, counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
-        turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
+        turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, over: g.over, mode: g.mode, ranks: g.ranks, early: !!g.early, msg: g.msg, ok: g.over ? [] : playable(g, idx) } });
   });
   schedBot(room);
 }
 // Easy bot: plays a random legal card after a short pause.
 function schedBot(room) {
   const g = room.game;
-  if (!g || g.winner >= 0 || room.botTimer) return;
+  if (!g || g.over || room.botTimer) return;
   const p = room.players[g.turn];
   if (!p || !p.bot) return;
   room.botTimer = setTimeout(() => {
     room.botTimer = null;
     const g2 = room.game;
-    if (!g2 || g2.winner >= 0) return;
+    if (!g2 || g2.over) return;
     const i = g2.turn, b = room.players[i];
     if (!b || !b.bot) return;
     if (playable(g2, i).length && play(room, i, botPick(room, i, b.level))) push(room);
@@ -388,6 +417,7 @@ wss.on('connection', ws => {
       const room = ws.room; if (!room) return;
       if (m.type === 'leave') { leave(ws); return; }   // back to the main screen
       const idx = room.players.findIndex(x => x.ws === ws);
+      if (m.type === 'mode') { if (!room.game && idx >= 0 && (m.mode === 1 || m.mode === 2)) { room.mode = m.mode; push(room); } return; }
       if (m.type === 'vjoin') {
         if (idx < 0 || room.players[idx].bot) return;
         room.players[idx].voice = true;
@@ -418,7 +448,7 @@ wss.on('connection', ws => {
         for (let k = room.players.length - 1; k >= 0; k--) if (room.players[k].bot) { room.players.splice(k, 1); break; }
         return push(room);
       }
-      if (m.type === 'lobby' || m.type === 'again') { if (room.game && room.game.winner >= 0) toLobby(room); return; }
+      if (m.type === 'lobby' || m.type === 'again') { if (room.game && room.game.over) toLobby(room); return; }
       if (m.type === 'start') {
         if (room.players.length < 2) return send(ws, { type: 'error', text: 'Need at least 2 players.' });
         if (room.game) return;
