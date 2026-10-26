@@ -105,7 +105,6 @@ button:disabled{opacity:.4}
 #vj{right:106px;box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}#mic{right:106px}#vx{right:154px}
 #mic.on{background:#1f7a46;box-shadow:inset 0 0 0 2px #3ddc84,0 3px 8px #0008}#mic.off{background:#7a1f24;box-shadow:inset 0 0 0 2px #e5484d,0 3px 8px #0008}
 body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
-#vc{position:fixed;top:max(8px,env(safe-area-inset-top));left:58px;z-index:99;width:40px;height:40px;display:none;align-items:center;justify-content:center;border-radius:50%;font-size:20px;text-decoration:none;background:#5865f2;box-shadow:inset 0 0 0 2px #fff6,0 3px 8px #0008}
 #info{position:fixed;top:max(8px,env(safe-area-inset-top));left:10px;z-index:99;width:40px;height:40px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:50%;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:900;font-size:22px;line-height:1;background:#000a;color:var(--gold);box-shadow:inset 0 0 0 2px var(--gold),0 3px 8px #0008}
 .ov{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:16px;background:#000c}.ov[hidden]{display:none}
 .rc{position:relative;max-width:460px;width:100%;max-height:86vh;overflow:auto;text-align:left;padding:20px 18px 16px;border-radius:20px;background:linear-gradient(160deg,#17382a,#0a1d14);border:1px solid #f5c54255;box-shadow:0 18px 50px #000}
@@ -137,7 +136,6 @@ body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 <li><b>After the game:</b> tap Back to lobby when you are ready. There you can change avatars, add bots and deal again.</li>
 <li><b>Voice talk:</b> when two or more real players are in the room, tap 🎙 to join voice. Tap the green 🎤 to mute or unmute your microphone, and 📴 to leave voice. Bots are not part of voice.</li>
 <li><b>Chat:</b> tap the 💬 button to type messages to the other players in your room.</li>
-<li><b>Voice chat:</b> tap the blue 🎧 button to join your group's Discord voice channel. Paste the invite link on the room screen first.</li>
 </ul></div></div>
 <button id="cb" aria-label="Chat" style="display:none">💬<span id="cbd" hidden></span></button>
 <div id="chat" class="cs" hidden>
@@ -148,7 +146,6 @@ body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 <button id="vj" aria-label="Join voice chat">🎙</button>
 <button id="mic" aria-label="Microphone on or off">🎤</button>
 <button id="vx" aria-label="Leave voice chat">📴</button>
-<a id="vc" href="#" target="_blank" rel="noopener noreferrer" aria-label="Join voice chat on Discord" style="display:none">🎧</a>
 <div id="stats" class="ov" hidden><div class="rc"><button class="x" id="sx" aria-label="Close">✕</button><div id="sb"></div></div></div>
 <div id="toast" style="display:none"></div>
 <div id="app"></div>
@@ -156,7 +153,7 @@ body.tb{padding-top:max(56px,calc(env(safe-area-inset-top) + 50px))}
 const SU=['♠','♣','♦','♥'],RN={11:'J',12:'Q',13:'K',14:'A'},su=c=>Math.floor(c/13),rk=c=>c%13+2,rl=r=>RN[r]||r;
 const AV=['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const $=document.getElementById('app'),esc=t=>String(t).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
-let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,voiceUrl='',winAt=0,pendingDraw=false,botLevel='easy',chatMsgs=[],unread=0;
+let ws,S=null,uname='',err='',room='',pid='',avatar='',sel=null,animHand=false,prevTL=0,lvl=0,tableMode=false,winAt=0,pendingDraw=false,botLevel='easy',chatMsgs=[],unread=0;
 try{room=localStorage.getItem('dk_room')||'';uname=localStorage.getItem('dk_name')||'';avatar=localStorage.getItem('dk_av')||'';pid=localStorage.getItem('dk_pid')||'';if(!pid){pid=Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('dk_pid',pid)}}catch(e){pid=pid||Math.random().toString(36).slice(2)+Date.now().toString(36)}
 
 try{botLevel=localStorage.getItem('dk_lvl')||'easy'}catch(e){}
@@ -313,7 +310,7 @@ function connect(){
       if(ng&&ng.first&&(!pg||pg.winner>=0)){animHand=true;sfx('start')}
       else if(ng&&pg&&ng.winner<0&&ng.seq>pg.seq)sfx('card');
       if(ng&&ng.winner>=0&&(!pg||pg.winner<0)){const sad=donkeys(ng.counts,ng.winner).includes(m.me);sfx(sad?'sad':'win');rain(sad?['🫏']:['🎉','✨','⭐','🃏','♠','♥','♦','♣'])}
-      voiceUrl=m.voice||'';S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
+      S=m;err='';if(m.players[m.me]&&m.players[m.me].avatar){avatar=m.players[m.me].avatar;try{localStorage.setItem('dk_av',avatar)}catch(e){}}}
     else if(m.type==='chatlog'){chatMsgs=m.msgs||[];unread=0;renderChat()}
     else if(m.type==='chat'){chatMsgs.push(m.msg);if(chatMsgs.length>60)chatMsgs.shift();if(chatEl.hidden&&!m.msg.mine)unread++;renderChat()}
     else if(m.type==='ice'){if(Array.isArray(m.servers)&&m.servers.length)iceServers=m.servers}
@@ -368,11 +365,10 @@ function render(){
     const hasBot=S.players.some(p=>p.bot);
     h+=`<div class="sub" style="margin-top:6px">🤖 Bot level for new bots</div><div class="seg">${['easy','medium','hard'].map(l=>`<button data-l="${l}" class="${l===botLevel?'on':''}">${l[0].toUpperCase()+l.slice(1)}</button>`).join('')}</div><div style="margin:10px 0 4px">${n<5?'<button id="ab" class="sec">🤖 Add bot</button> ':''}${hasBot?'<button id="rb" class="sec">Remove bot</button>':''}</div>`;
     h+=n<2?'<p class="sub">Waiting for another player or a bot…</p>':`<button id="st" style="margin-top:12px">Deal the cards (${n} players)</button>`;
-    $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button><div style="margin-top:18px"><input id="vu" placeholder="https://discord.gg/yourinvite" value="${esc(S.voice||'')}" style="text-transform:none;letter-spacing:0;font-size:14px"><button id="vs" class="sec">Save voice link</button><div class="sub" style="margin-top:10px">🎧 Voice chat (Discord)</div><div class="sub">${S.voice?'Voice link is set. Tap the blue 🎧 button (top-left) to join.':'In Discord: open your voice channel, tap Invite, copy the link and paste it above.'}</div></div></div>`;
-    document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;voiceUrl='';err='';sel=null;winAt=0;prevTL=0;draw()};
+    $.innerHTML=h+`<div class="err">${esc(err)}</div><button id="lv" class="sec" style="margin-top:6px">← Back to main screen</button></div>`;
+    document.getElementById('lv').onclick=()=>{send({type:'leave'});S=null;err='';sel=null;winAt=0;prevTL=0;draw()};
     $.querySelectorAll('.avs button').forEach(b=>b.onclick=()=>send({type:'avatar',a:b.dataset.a}));
     const iv2=document.getElementById('inv2');if(iv2)iv2.onclick=()=>shareInvite(S.room);
-    const vs=document.getElementById('vs');if(vs)vs.onclick=()=>send({type:'voice',url:document.getElementById('vu').value});
     const ab=document.getElementById('ab');if(ab)ab.onclick=()=>send({type:'addbot',level:botLevel});
     $.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{botLevel=b.dataset.l;try{localStorage.setItem('dk_lvl',botLevel)}catch(e){}draw()});
     const rb=document.getElementById('rb');if(rb)rb.onclick=()=>send({type:'rmbot'});
@@ -418,7 +414,6 @@ function draw(){
     vjBtn.style.display=(S&&humans>=2&&!inVoice)?'flex':'none';micBtn.style.display=vxBtn.style.display=inVoice?'flex':'none';
     micBtn.className=micOn?'on':'off';micBtn.textContent=micOn?'🎤':'🔇'}
   if(cb.style){cb.style.display=S?'flex':'none';if(!S){chatEl.hidden=true;chatMsgs=[];unread=0}}
-  const vc=document.getElementById('vc');if(vc.style){vc.style.display=voiceUrl?'flex':'none';vc.style.left=tableMode?'10px':'58px'}vc.href=voiceUrl||'#';
 }
 document.addEventListener('focusout',()=>{if(pendingDraw)setTimeout(()=>{if(!typingInApp())draw()},400)});
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tableMode)draw()},150)});

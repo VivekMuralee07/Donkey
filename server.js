@@ -9,9 +9,6 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'applica
 const AVATARS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦄','🐶','🐱','🐙','🦉','🐢','🐧','🐘','🦖','🐰'];
 const MAX_PLAYERS = 5;
 const BOT_NAMES = ['Bolt', 'Pixel', 'Turbo', 'Nova', 'Zippy'], BOT_AVATARS = ['🤖', '👾', '🎃', '🧠', '🛸'];
-// Optional Discord voice-chat invite. Set DISCORD_INVITE on Render to give every room a default link; players can also paste one per room.
-const VOICE_RE = /^https:\/\/(discord\.gg|(www\.)?discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,40}$/;
-const DEFAULT_VOICE = VOICE_RE.test(process.env.DISCORD_INVITE || '') ? process.env.DISCORD_INVITE : '';
 // WebRTC voice chat: the server only relays the connection setup messages; the audio goes straight between the players' phones.
 // Set ICE_SERVERS on Render (JSON list, e.g. a TURN server) if some players cannot hear each other.
 const ICE = (() => { try { const j = JSON.parse(process.env.ICE_SERVERS || ''); if (Array.isArray(j) && j.length) return j; } catch (e) { /* use the default */ } return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }]; })();
@@ -276,8 +273,11 @@ function botPick(room, i, level) {
 
 function play(room, i, c) { if (!playCore(room, i, c)) return false; checkEarly(room); return true; }
 
-// Early finish: the player whose turn it is holds cards of ONE suit only, and has to play that suit
-// (leading it, or following it). If the next player has none of that suit, the game ends and the next player wins.
+// Early finish: the player X whose turn it is holds cards of ONE suit only and has to play that suit, AND is stuck:
+// X is leading it, or every card X holds is higher than the highest card of that suit already on the table (so X cannot
+// avoid becoming the highest). If the next player Y has none of that suit, Y cuts and X would have to pick up the whole
+// table again and again. The game ends and Y wins.
+// If X holds a LOWER card than the one on the table, X is not stuck: X plays it and the owner of the highest card picks up.
 function checkEarly(room) {
   const g = room.game, n = room.players.length;
   if (!g || g.winner >= 0) return;
@@ -287,6 +287,7 @@ function checkEarly(room) {
   if (!hand.every(c => su(c) === s)) return;
   if (g.trick.length && g.lead !== s) return;   // x must follow a different suit, so the rule does not apply
   if (g.trick.length + 1 >= n) return;          // x is last to play: the round simply ends with x's card
+  if (g.trick.length && Math.min(...hand.map(rk)) < Math.max(...g.trick.map(t => rk(t.c)))) return;   // x can play a lower card: not stuck
   const y = (x + 1) % n;
   if (!g.hands[y].length || g.hands[y].some(c => su(c) === s)) return;
   g.winner = y; g.early = true;
@@ -310,7 +311,7 @@ function push(room) {
   room.players.forEach((p, idx) => {
     const g = room.game;
     send(p.ws, { type: 'state', room: room.code, me: idx,
-      voice: room.voice || DEFAULT_VOICE, learned: learn.games,
+      learned: learn.games,
       players: room.players.map(q => ({ vid: q.vid, voice: !!q.voice, name: q.name, online: q.bot || !!q.ws, avatar: q.avatar, bot: !!q.bot, level: q.level })),
       game: g && { gid: g.id, counts: g.hands.map(h => h.length), hand: g.hands[idx], trick: g.trick, last: g.last,
         turn: g.turn, lead: g.lead, first: g.first, seq: g.seq, winner: g.winner, early: !!g.early, msg: g.msg, ok: g.winner < 0 ? playable(g, idx) : [] } });
@@ -397,11 +398,6 @@ wss.on('connection', ws => {
       if (m.type === 'avatar') {
         if (!room.game && idx >= 0 && AVATARS.includes(m.a) && !room.players.some((q, k) => k !== idx && q.avatar === m.a)) { room.players[idx].avatar = m.a; push(room); }
         return;
-      }
-      if (m.type === 'voice') {
-        const u = String(m.url || '').trim().slice(0, 100);
-        if (idx >= 0 && (u === '' || VOICE_RE.test(u))) { room.voice = u; return push(room); }
-        return send(ws, { type: 'error', text: 'Please paste a Discord invite link, like https://discord.gg/abc123' });
       }
       if (m.type === 'addbot') {
         if (room.game || idx < 0 || room.players.length >= MAX_PLAYERS) return;
